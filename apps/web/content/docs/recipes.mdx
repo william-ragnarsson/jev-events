@@ -1,0 +1,41 @@
+---
+title: Recipes
+description: Ready-made questions for chat, comments, email and calendars, straight from the library.
+icon: CookingPot
+---
+
+Recipes are plain question objects exported as `recipes`. Each asks one narrow judgment and spells out its outcomes, following [TypeSafe's guidance](https://docs.typesafe.ai/primitives). Use them as they are, or copy one and change the wording.
+
+```ts
+import { listen, recipes } from "jev-events";
+
+listen(source, { kind: recipes.chat.kind, hateful: recipes.chat.hateful });
+```
+
+The question id is yours to choose. `{ hate: recipes.chat.hateful }` fires `"hate"` instead of `"hateful"`.
+
+Thresholds are yours too. The chat recipes `kind`, `hateful`, `question`, `streamIssue` and `spam` are scored on the [benchmarks](/docs/benchmarks) page, which shows precision and recall at each threshold. The others haven't been benchmarked yet, so measure them on your own data before acting on them automatically.
+
+This page is rendered from the library's source, so it always matches the version on the site.
+
+## Chat
+
+For Twitch, YouTube Live and Discord.
+
+<RecipeList group="chat" />
+
+## Comments
+
+For comments under videos and posts.
+
+<RecipeList group="comments" />
+
+## Email
+
+<RecipeList group="email" />
+
+## Calendar
+
+Compute times in code and pass them as facts. Jev judges meaning; date math belongs in your code.
+
+<RecipeList group="calendar" />

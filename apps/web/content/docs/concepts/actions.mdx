@@ -1,0 +1,55 @@
+---
+title: Actions and handlers
+description: Run a built-in platform action or your own code when an outcome fires.
+icon: Zap
+---
+
+Every `.on()` takes an event, an optional policy and a handler. A handler is either **your own function** or a **native action** such as `twitch.timeout()`. You can attach as many handlers to one event as you like, and `.on()` returns the listener so calls chain.
+
+<Snippet name="actions" title="handlers.ts" />
+
+## Your functions
+
+Your function receives the triggered event: the typed `item`, every `answers`, the `trigger` that fired (event name, label, probability or score), `latencyMs`, `usage`, and whether the answer was `cached`.
+
+Your functions run whenever the outcome fires. Dry-run and protected users only gate native actions, because only you know what your function does. If it has side effects that should respect them, check the flags on the event:
+
+```ts
+chat.on("kind:spam", (e) => {
+  if (e.dryRun || e.protected) return;
+  strikes.add(e.item.author.id);
+});
+```
+
+An exception in a handler becomes an `error` event with `phase: "handler"`. It doesn't stop the listener or the other handlers.
+
+## Native actions
+
+Native actions call the platform's API: timeouts, bans, deletes, replies. Each one:
+
+- only logs what it would do while the listener is in dry-run, which is the default,
+- never runs on protected users, such as a Twitch channel's broadcaster, moderators and VIPs,
+- belongs to a platform, so attaching a Twitch action to a listener for another platform is a type error,
+- reports every outcome as an `action` event with a `status` of `done`, `dry-run`, `skipped` or `failed`.
+
+The actions for each platform are listed on its page, starting with [Twitch](/docs/integrations/twitch#actions).
+
+## Your own actions
+
+`defineAction()` wraps your code in the same guarantees. Use platform `"*"` for an action that works with any source, or a platform name to restrict it. `describe` is the line printed in dry-run and written to the audit log.
+
+## Counting with `burst()`
+
+Jev judges one item at a time; counting across items is a job for code. `burst()` wraps a handler so it only runs when an outcome fires a number of times within a window:
+
+```ts
+chat.on(
+  "streamIssue",
+  burst(
+    { count: 3, within: "45s", distinctBy: (e) => e.item.author.id },
+    (b) => alertStreamer(`${b.events.length} viewers say the stream is broken`),
+  ),
+);
+```
+
+`distinctBy` counts each person once, so one angry viewer spamming "no sound" doesn't page anyone. After a burst fires, it stays quiet for `cooldown`, which defaults to the window.

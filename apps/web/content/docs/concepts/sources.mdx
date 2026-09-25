@@ -1,0 +1,88 @@
+---
+title: Sources
+description: Where items come from. Use a connector, wrap any async iterable, accept webhooks or write your own in 30 lines.
+icon: Radio
+---
+
+A source connects to a stream and emits **items**. Every item has the same small shape, whatever the platform:
+
+```ts
+interface Item {
+  id: string; // unique within its source
+  text: string; // what Jev judges
+  author?: { id: string; name: string; roles?: string[] };
+  at: Date; // when it was created at its origin
+  // Lean facts shown to Jev, such as { firstMessage: true }
+  facts?: Record<string, JsonValue>;
+  raw?: unknown; // the original payload; never sent to Jev
+}
+```
+
+Connectors add typed fields on top. A Twitch chat item also has `channel`, `firstMessage`, `reply` and `bits`, and your handlers see them with full types.
+
+## Built-in sources
+
+| Source | Package | Notes |
+| --- | --- | --- |
+| `twitch.chat(channel, { auth? })` | `@jev-events/twitch` | Read-only without `auth`; can moderate with it. [Guide](/docs/integrations/twitch) |
+| `from(iterable, options?)` | `jev-events` | Any iterable or async iterable of strings or objects |
+| `webhook(options?)` | `jev-events` | Items arrive as HTTP POSTs |
+| `bluesky(options?)` | `jev-events/public` | The public Bluesky firehose, read-only |
+| `twitchChat(channel)` | `jev-events/public` | Anonymous, read-only Twitch chat with no extra package |
+
+## `from()`
+
+Wrap anything you can iterate: log lines, a queue consumer, rows from a database cursor. Strings become items directly; objects can carry an `id`, `author`, `at` and `facts`.
+
+<Snippet name="custom" title="any-stream.ts" />
+
+<TypeTable
+  type={{
+    noun: { type: 'string', default: '"item"', description: 'What one item is called in Jev\'s state, e.g. "line" or "ticket".' },
+    map: { type: '(value) => ItemInput | null', description: 'Turn each value into an item. Return null to skip it.' },
+    recent: { type: 'number', default: '0', description: 'How many preceding items to show Jev as context.' },
+    id: { type: 'string', description: 'A readable name for logs.' },
+  }}
+/>
+
+A finite iterable ends the source when it runs out, so `await listener.run()` judges everything and returns the stats. That makes `from()` handy for backfills and [tests](/docs/testing).
+
+## `webhook()`
+
+Starts a small HTTP server. POST a string, `{ "text": "..." }`, or an array of them:
+
+```bash
+curl -X POST http://127.0.0.1:8787/ \
+  -H "Authorization: Bearer $WEBHOOK_SECRET" \
+  -d '{"text": "Your product broke my build again and nobody answers"}'
+```
+
+<TypeTable
+  type={{
+    port: { type: 'number', default: '8787', description: 'Use 0 for a random free port.' },
+    host: { type: 'string', default: '"127.0.0.1"', description: 'Use "0.0.0.0" to accept requests from other machines.' },
+    path: { type: 'string', default: '"/"' },
+    secret: { type: 'string', description: 'Require Authorization: Bearer <secret>.' },
+    map: { type: '(body) => ItemInput | ItemInput[] | null', description: 'Turn a request body into items, for example a GitHub or Stripe payload.' },
+    maxBytes: { type: 'number', default: '1 MB', description: 'The largest accepted body.' },
+  }}
+/>
+
+## Write your own
+
+A source is a plain object with an `id`, a `platform` and a `start(ctx)` that emits items. `start` resolves once the source is connected and keeps emitting until `ctx.signal` aborts.
+
+<Snippet name="source" title="status-page.ts" />
+
+<TypeTable
+  type={{
+    id: { type: 'string', required: true, description: 'A readable identifier such as "twitch:chat:mychannel".' },
+    platform: { type: 'string', required: true, description: 'Native actions must match it. This is how a Discord action on a Twitch listener becomes a type error.' },
+    start: { type: '(ctx) => Promise<void> | void', required: true, description: 'Connect and emit with ctx.emit(item). Report problems with ctx.fail(error); call ctx.end() after the last item of a finite source.' },
+    noun: { type: 'string', default: '"item"', description: 'What one item is called in Jev\'s state.' },
+    canAct: { type: 'boolean', description: 'Whether native actions can run for real. Dry-run works either way.' },
+    defaults: { type: '{ maxLagMs?: number; recent?: number }', description: 'Sensible defaults for this kind of stream. The listener\'s options win.' },
+    describe: { type: '(item) => JsonValue', description: 'The lean view of an item that Jev sees. Defaults to its text, author, roles and facts.' },
+    isProtected: { type: '(item) => boolean', description: 'Items from privileged users, such as moderators. Native actions never run on them.' },
+  }}
+/>

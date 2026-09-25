@@ -1,0 +1,64 @@
+---
+title: What Jev sees
+description: The state sent with each item, how to add context, and how to take full control.
+icon: Eye
+---
+
+Jev only knows what's in the request. For each item, Jev Events builds a small JSON **state** and asks your questions about it. By default the state for a Twitch chat message looks like this:
+
+```json
+{
+  "message": {
+    "firstMessage": true,
+    "text": "is this the dlc boss?",
+    "author": "viewer_42"
+  },
+  "recent": [
+    { "author": "viewer_7", "text": "LETS GO" },
+    { "author": "viewer_19", "text": "he's so close" },
+    { "author": "viewer_3", "text": "phase 2 incoming" }
+  ]
+}
+```
+
+- The item sits under its **noun** (`message`, `line`, `item`), with its text, author, roles and facts. Platform payloads in `item.raw` are never sent.
+- **Facts** are lean, precomputed signals. Twitch adds `firstMessage` for first-time chatters and `replyingTo` for replies, because both change what a message means.
+- **`recent`** holds the messages just before it. Twitch shows three by default. Set `context: { recent: 0 }` to send the text alone.
+- Whenever there is context, each question is pointed at the item itself, so Jev judges the message and reads the rest as background.
+
+## Add what Jev can't know
+
+`context.about` adds static facts about the stream to every request, such as the game, the rules, or what counts as a spoiler:
+
+```ts
+listen(twitch.chat("mychannel"), questions, {
+  context: {
+    recent: 5,
+    about: {
+      game: "Elden Ring",
+      rules: ["No spoilers past Margit", "No backseating"],
+    },
+  },
+});
+```
+
+Keep it short: it's sent with every item and you pay for its tokens every time.
+
+## Take full control
+
+Pass `state` to build the state yourself. It receives the item, the recent items and `about`:
+
+```ts
+listen(from(tickets), questions, {
+  state: (ticket, { recent }) => ({
+    ticket: { subject: ticket.facts?.subject ?? null, body: ticket.text },
+    previousTickets: recent.length,
+  }),
+  // Point every question at this key. false sends questions unchanged.
+  inspect: "ticket",
+});
+```
+
+## Costs
+
+You pay for input tokens only: the state plus your questions, for every item. Context is the lever you control. Every recent message adds its text to every request, and often helps with short, ambiguous messages. Measure the trade-off on your own stream with `listener.stats()`, which reports tokens and estimated spend.

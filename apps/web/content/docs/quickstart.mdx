@@ -1,0 +1,87 @@
+---
+title: Quickstart
+description: Label a live Twitch chat with Jev in five minutes, then let it moderate your own channel.
+icon: Rocket
+---
+
+<Callout title="No code first?">
+  `npx jev-events watch twitch:<channel>` labels any public chat in your terminal. See the [CLI](/docs/cli).
+</Callout>
+
+<Steps>
+<Step>
+
+### Install
+
+Jev Events needs Node.js 22 or newer.
+
+```bash
+npm i jev-events @jev-events/twitch
+```
+
+</Step>
+<Step>
+
+### Add your TypeSafe key
+
+Get an API key from [TypeSafe](https://docs.typesafe.ai/introduction/quickstart) and put it in your environment. The library reads `TYPESAFE_API_KEY`.
+
+```bash
+export TYPESAFE_API_KEY=...
+```
+
+</Step>
+<Step>
+
+### Listen to a chat
+
+Reading a public Twitch chat needs no Twitch account. Pick any channel that is live right now.
+
+<Snippet name="quickstart" title="listener.ts" />
+
+</Step>
+<Step>
+
+### Run it
+
+```bash
+npx tsx listener.ts
+```
+
+Questions for the streamer are printed as they arrive. The timeout never happens: native actions start in dry-run, so you'll only see a line like this.
+
+```txt
+[jev-events] [dry-run] would timeout viewer_42 for 600s (hateful p=0.97)
+```
+
+</Step>
+<Step>
+
+### Moderate your own channel
+
+To act for real, sign in a bot account and make it a moderator.
+
+```bash
+npx jev-events auth twitch --client-id <your Twitch app's client id>
+```
+
+Then type `/mod <your bot>` in your chat. Pass the saved sign-in and turn dry-run off:
+
+```ts
+const chat = listen(
+  twitch.chat("mychannel", { auth: twitch.auth.fromFile() }),
+  { kind: recipes.chat.kind, hateful: recipes.chat.hateful },
+  { dryRun: false },
+);
+```
+
+The [Twitch guide](/docs/integrations/twitch) covers the Twitch app, scopes and every action.
+
+</Step>
+</Steps>
+
+## Next
+
+- [Questions](/docs/concepts/questions): write your own, and choose thresholds.
+- [Safety](/docs/concepts/safety): budgets, rate limits, the review band and the audit log.
+- [Recipes](/docs/recipes): ready-made questions to start from.

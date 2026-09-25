@@ -1,0 +1,170 @@
+[
+  {
+    "usage": "recipes.chat.kind",
+    "group": "chat",
+    "id": "kind",
+    "type": "choice",
+    "instructions": "What is this live chat message mainly doing?",
+    "criteria": {
+      "question": "Asks the streamer or chat a genuine question",
+      "hype": "Cheers, celebrates or reacts with excitement",
+      "joke": "A joke, meme, emote spam or friendly banter",
+      "backseat": "Tells the streamer how to play or what to do, without being asked",
+      "spam": "Advertising, self-promotion, scams, suspicious links or repeated junk",
+      "other": "Anything else"
+    }
+  },
+  {
+    "usage": "recipes.chat.hateful",
+    "group": "chat",
+    "id": "hateful",
+    "type": "noul",
+    "instructions": "Does this message attack, insult or demean a person or group?",
+    "criteria": {
+      "true": "Harassment, slurs, threats or dehumanizing language aimed at someone",
+      "false": "No attack on anyone; swearing, banter and criticism of gameplay are fine"
+    }
+  },
+  {
+    "usage": "recipes.chat.question",
+    "group": "chat",
+    "id": "question",
+    "type": "noul",
+    "instructions": "Is this message a genuine question directed at the streamer?",
+    "criteria": null
+  },
+  {
+    "usage": "recipes.chat.streamIssue",
+    "group": "chat",
+    "id": "streamIssue",
+    "type": "noul",
+    "instructions": "Is this message reporting a technical problem with the stream itself, such as no sound, lag, buffering, a black screen or audio out of sync?",
+    "criteria": null
+  },
+  {
+    "usage": "recipes.chat.spam",
+    "group": "chat",
+    "id": "spam",
+    "type": "noul",
+    "instructions": "Is this message spam: advertising, self-promotion, a scam or a suspicious link?",
+    "criteria": null
+  },
+  {
+    "usage": "recipes.chat.spoiler(\"Elden Ring\")",
+    "group": "chat",
+    "id": "spoiler",
+    "type": "noul",
+    "instructions": "Does this message reveal story, ending or boss details about Elden Ring that a first-time player would not want to know?",
+    "criteria": null
+  },
+  {
+    "usage": "recipes.chat.toxicity",
+    "group": "chat",
+    "id": "toxicity",
+    "type": "score",
+    "instructions": "How toxic is this message toward other people?",
+    "criteria": [
+      "Friendly or neutral",
+      "Rude or dismissive, but not aimed at hurting anyone",
+      "Insulting or mean toward someone",
+      "Harassment, slurs or threats"
+    ]
+  },
+  {
+    "usage": "recipes.comments.kind",
+    "group": "comments",
+    "id": "kind",
+    "type": "choice",
+    "instructions": "What is this comment mainly doing?",
+    "criteria": {
+      "question": "Asks the creator a genuine question",
+      "praise": "Compliments or thanks the creator",
+      "feedback": "Constructive criticism or a correction",
+      "idea": "Suggests an idea for future content",
+      "spam": "Advertising, scams, bots or suspicious links",
+      "hateful": "Harasses, insults or demeans someone",
+      "other": "Anything else"
+    }
+  },
+  {
+    "usage": "recipes.comments.needsReply",
+    "group": "comments",
+    "id": "needsReply",
+    "type": "noul",
+    "instructions": "Would a reply from the creator be valuable to this commenter?",
+    "criteria": null
+  },
+  {
+    "usage": "recipes.email.needsReply",
+    "group": "email",
+    "id": "needsReply",
+    "type": "noul",
+    "instructions": "Does this email need a personal reply from the recipient?",
+    "criteria": {
+      "true": "A real person asks the recipient something or expects a response",
+      "false": "Newsletters, notifications, receipts, marketing or messages sent just for information"
+    }
+  },
+  {
+    "usage": "recipes.email.kind",
+    "group": "email",
+    "id": "kind",
+    "type": "choice",
+    "instructions": "What kind of email is this?",
+    "criteria": {
+      "personal": "Written by someone to the recipient personally",
+      "work": "About the recipient's job, projects or colleagues",
+      "receipt": "Receipts, invoices, orders and shipping updates",
+      "newsletter": "Newsletters and marketing",
+      "notification": "Automated notifications and alerts",
+      "other": "Anything else"
+    }
+  },
+  {
+    "usage": "recipes.email.urgent",
+    "group": "email",
+    "id": "urgent",
+    "type": "noul",
+    "instructions": "Does the sender say this is urgent or time-sensitive?",
+    "criteria": null
+  },
+  {
+    "usage": "recipes.email.phishing",
+    "group": "email",
+    "id": "phishing",
+    "type": "noul",
+    "instructions": "Does this email try to get the recipient to share credentials, pay money or open a link under false pretenses?",
+    "criteria": null
+  },
+  {
+    "usage": "recipes.calendar.needsPrep",
+    "group": "calendar",
+    "id": "needsPrep",
+    "type": "noul",
+    "instructions": "Would the attendee need to prepare before this event, for example by reading material, building slides or making a decision?",
+    "criteria": null
+  },
+  {
+    "usage": "recipes.calendar.likelySales",
+    "group": "calendar",
+    "id": "likelySales",
+    "type": "noul",
+    "instructions": "Is this invitation most likely a sales or vendor pitch?",
+    "criteria": null
+  },
+  {
+    "usage": "recipes.calendar.kind",
+    "group": "calendar",
+    "id": "kind",
+    "type": "choice",
+    "instructions": "What kind of event is this?",
+    "criteria": {
+      "meeting": "A work meeting with other people",
+      "interview": "A job interview",
+      "social": "A social or personal event with other people",
+      "focus": "Time blocked for focused work",
+      "personal": "An appointment or reminder for the owner only",
+      "other": "Anything else"
+    }
+  }
+]

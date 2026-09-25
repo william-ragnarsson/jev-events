@@ -1,0 +1,16 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.jev-events/
+.next/
+.vercel/
+coverage/
+.DS_Store
+*.log
+
+# Offline eval runs and raw recordings awaiting labels
+evals/results/mock/
+evals/datasets/raw/

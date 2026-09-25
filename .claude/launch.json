@@ -1,0 +1,28 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mock-jev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "mock-jev"],
+      "port": 8799
+    },
+    {
+      "name": "relay",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "TYPESAFE_API_KEY=mock",
+        "TYPESAFE_BASE_URL=http://127.0.0.1:8799",
+        "LIVE_CHANNELS=kaicenat,jynxzi,caseoh_,xqc,summit1g,tarik,lirik,shroud",
+        "npm", "start", "-w", "@jev-events/live-relay"
+      ],
+      "port": 8790
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["NEXT_PUBLIC_RELAY_URL=http://localhost:8790", "npm", "run", "dev", "-w", "@jev-events/web"],
+      "port": 3000
+    }
+  ]
+}

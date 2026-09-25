@@ -1,0 +1,36 @@
+---
+title: Testing
+description: Test your listeners without network calls or an API key, using a fake Jev client.
+icon: FlaskConical
+---
+
+`jev-events/testing` exports `mockJev()`, a fake client that answers from a function you write. Pass it as `client`, feed items with `from()`, and `run()` judges them all and returns the stats.
+
+<Snippet name="testing" title="outage.test.ts" />
+
+This example runs in the project's own test suite, so it keeps working as the library changes.
+
+## Answers
+
+`mockJev` takes a function from the request to an answer per question id. Shorthands keep tests short:
+
+| Question | Shorthand | Means |
+| --- | --- | --- |
+| noul | `0.93` | The probability of yes |
+| choice | `"spam"` | This label, with probability 1 |
+| choice | `{ spam: 0.7, other: 0.3 }` | These probabilities; the highest wins |
+| score | `2.4` | The expected score |
+
+Any full SDK response works too. A missing answer, or a label the question doesn't have, throws, so typos in tests fail loudly.
+
+## Options
+
+```ts
+mockJev(respond, { latencyMs: 120, inputTokens: 150, model: "jev-mock" });
+```
+
+`latencyMs` delays each answer, which is useful for testing `maxLagMs` and queues. `inputTokens` sets the usage reported for each request, for testing budgets.
+
+## Inspect requests
+
+`jev.calls` records every request in order, so you can check exactly what Jev was shown, as the last line of the example does. It's the quickest way to debug a question that answers differently than you expected.

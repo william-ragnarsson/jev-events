@@ -1,0 +1,278 @@
+{"id":"q01","text":"what sens do you play on?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q02","text":"how long have you been streaming today?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q03","text":"what keyboard is that? it sounds amazing","lang":"en","kind":"question","flags":["question"]}
+{"id":"q04","text":"is this your first playthrough?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q05","text":"when is the next stream?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q06","text":"what rank are you right now?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q07","text":"do you ever play with viewers?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q08","text":"which character are you maining this season?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q09","text":"did you read the patch notes yet?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q10","text":"how do you like the new update so far?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q11","text":"are you going to play the DLC after this?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q12","text":"what mic do you use? your audio is super clean","lang":"en","kind":"question","flags":["question"]}
+{"id":"q13","text":"can you explain how you got past that locked door?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q14","text":"why did you pick the shield over the bow?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q15","text":"how old is your dog? she's adorable","lang":"en","kind":"question","flags":["question"]}
+{"id":"q16","text":"hey what song is this?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q17","text":"will you do a charity stream again this year?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q18","text":"how many hours do you have in this game?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q19","text":"do you have a discord server?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q20","text":"what time zone are you in?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q21","text":"where did you get that hoodie?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q22","text":"is this ranked or casual?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q23","text":"can you show your crosshair settings after this round?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q24","text":"did you beat the first game too?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q25","text":"are you streaming tomorrow or taking a break?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q26","text":"what was that indie game you played last week called?","lang":"en","kind":"question","flags":["question"]}
+{"id":"q27","text":"how do you stay so calm when chat is roasting you lol","lang":"en","kind":"question","flags":["question"],"tags":["banter"]}
+{"id":"q28","text":"yo streamer what fov are you on","lang":"en","kind":"question","flags":["question"],"tags":["slang"]}
+{"id":"q29","text":"chat what game is this?","lang":"en","kind":"question","tags":["hard-negative"]}
+{"id":"q30","text":"does anyone in chat know if this is on game pass?","lang":"en","kind":"question","tags":["hard-negative"]}
+{"id":"q31","text":"anyone else here from the youtube clip?","lang":"en","kind":"question","kindAlso":["other"],"tags":["hard-negative"]}
+{"id":"q32","text":"chat is it just me or is this boss way harder than in the first game?","lang":"en","kind":"question","tags":["hard-negative"]}
+{"id":"q33","text":"why is he like this 😂","lang":"en","kind":"joke","kindAlso":["other"],"tags":["hard-negative"]}
+{"id":"q34","text":"just got here, what did I miss?","lang":"en","kind":"question","kindAlso":["other"],"borderline":true}
+{"id":"h01","text":"LETS GOOOOOO","lang":"en","kind":"hype"}
+{"id":"h02","text":"WHAT A CLUTCH","lang":"en","kind":"hype"}
+{"id":"h03","text":"POGGERS","lang":"en","kind":"hype","tags":["emote"]}
+{"id":"h04","text":"HOLY that 1v4 was insane","lang":"en","kind":"hype"}
+{"id":"h05","text":"no way he hit that shot","lang":"en","kind":"hype"}
+{"id":"h06","text":"GG that was so clean","lang":"en","kind":"hype"}
+{"id":"h07","text":"W streamer","lang":"en","kind":"hype","tags":["slang"]}
+{"id":"h08","text":"LETSGO LETSGO LETSGO","lang":"en","kind":"hype"}
+{"id":"h09","text":"that combo was absolutely filthy","lang":"en","kind":"hype","tags":["slang","hard-negative"]}
+{"id":"h10","text":"he's so back","lang":"en","kind":"hype","tags":["slang"]}
+{"id":"h11","text":"this run is the one, I can feel it","lang":"en","kind":"hype"}
+{"id":"h12","text":"HUGE","lang":"en","kind":"hype"}
+{"id":"h13","text":"chat we are witnessing history","lang":"en","kind":"hype"}
+{"id":"h14","text":"insane reaction time omg","lang":"en","kind":"hype"}
+{"id":"h15","text":"PogChamp PogChamp PogChamp","lang":"en","kind":"hype","tags":["emote"]}
+{"id":"h16","text":"that was cinema","lang":"en","kind":"hype","tags":["slang"]}
+{"id":"h17","text":"bro is cooking","lang":"en","kind":"hype","tags":["slang"]}
+{"id":"h18","text":"sheesh 🔥🔥🔥","lang":"en","kind":"hype","tags":["slang"]}
+{"id":"h19","text":"he's him","lang":"en","kind":"hype","tags":["slang"]}
+{"id":"h20","text":"first try LETS GOOO","lang":"en","kind":"hype"}
+{"id":"h21","text":"that headshot was disgusting holy","lang":"en","kind":"hype","tags":["slang","hard-negative"]}
+{"id":"h22","text":"you absolute monster, how did you survive that 😂","lang":"en","kind":"hype","kindAlso":["joke"],"tags":["hard-negative"]}
+{"id":"h23","text":"no cap that was the best play of the week","lang":"en","kind":"hype","tags":["slang"]}
+{"id":"h24","text":"the comeback is real","lang":"en","kind":"hype"}
+{"id":"h25","text":"you absolute madman","lang":"en","kind":"hype","kindAlso":["joke"],"tags":["hard-negative"]}
+{"id":"h26","text":"catJAM catJAM catJAM","lang":"en","kind":"joke","kindAlso":["hype"],"tags":["emote"]}
+{"id":"j01","text":"KEKW","lang":"en","kind":"joke","tags":["emote"]}
+{"id":"j02","text":"OMEGALUL","lang":"en","kind":"joke","tags":["emote"]}
+{"id":"j03","text":"LUL LUL LUL","lang":"en","kind":"joke","tags":["emote"]}
+{"id":"j04","text":"he forgot to eat his vegetables, that's why he missed","lang":"en","kind":"joke"}
+{"id":"j05","text":"chat is he stupid","lang":"en","kind":"joke","kindAlso":["other"],"tags":["banter","hard-negative"],"borderline":true}
+{"id":"j06","text":"skill issue","lang":"en","kind":"joke","tags":["slang","banter","hard-negative"]}
+{"id":"j07","text":"caught in 4k","lang":"en","kind":"joke","tags":["slang"]}
+{"id":"j08","text":"bro thought he was him 💀","lang":"en","kind":"joke","tags":["slang","banter"]}
+{"id":"j09","text":"the floor is lava and he's losing","lang":"en","kind":"joke"}
+{"id":"j10","text":"ratio","lang":"en","kind":"joke","kindAlso":["other"],"tags":["slang","banter"]}
+{"id":"j11","text":"this is why we can't have nice things","lang":"en","kind":"joke"}
+{"id":"j12","text":"💀💀💀","lang":"en","kind":"joke","kindAlso":["other"],"tags":["emote"]}
+{"id":"j13","text":"not the dramatic music 😭","lang":"en","kind":"joke"}
+{"id":"j14","text":"his aim is on vacation today","lang":"en","kind":"joke","tags":["banter","hard-negative"]}
+{"id":"j15","text":"certified bruh moment","lang":"en","kind":"joke","tags":["slang"]}
+{"id":"j16","text":"ICANT","lang":"en","kind":"joke","tags":["emote"]}
+{"id":"j17","text":"wow, great job walking into the lava for the 5th time 👏","lang":"en","kind":"joke","tags":["sarcasm","hard-negative"]}
+{"id":"j18","text":"nice aim, truly world class","lang":"en","kind":"joke","tags":["sarcasm","hard-negative"]}
+{"id":"j19","text":"oh yeah he definitely meant to do that","lang":"en","kind":"joke","tags":["sarcasm"]}
+{"id":"j20","text":"can't wait for him to die to the same trap again","lang":"en","kind":"joke","kindAlso":["other"],"tags":["sarcasm","hard-negative"]}
+{"id":"j21","text":"every time he says trust me something explodes","lang":"en","kind":"joke"}
+{"id":"j22","text":"that NPC has more game sense than half of chat","lang":"en","kind":"joke","tags":["banter","hard-negative"]}
+{"id":"j23","text":"lmaooo the jump scare got him","lang":"en","kind":"joke"}
+{"id":"j24","text":"his chair squeaks louder than the door in this game","lang":"en","kind":"joke"}
+{"id":"j25","text":"Kappa","lang":"en","kind":"joke","tags":["emote","sarcasm"]}
+{"id":"j26","text":"speedrunning the death screen any%","lang":"en","kind":"joke","tags":["banter"]}
+{"id":"j27","text":"imagine losing to a tutorial boss couldn't be me","lang":"en","kind":"joke","tags":["banter","hard-negative"]}
+{"id":"j28","text":"the dog is a better player than him honestly","lang":"en","kind":"joke","tags":["banter","hard-negative"]}
+{"id":"b01","text":"go left","lang":"en","kind":"backseat"}
+{"id":"b02","text":"use your ult now","lang":"en","kind":"backseat"}
+{"id":"b03","text":"craft the healing potion first","lang":"en","kind":"backseat"}
+{"id":"b04","text":"bro just parry","lang":"en","kind":"backseat","tags":["slang"]}
+{"id":"b05","text":"check the chest behind the waterfall","lang":"en","kind":"backseat"}
+{"id":"b06","text":"don't fight him yet, you're underleveled","lang":"en","kind":"backseat"}
+{"id":"b07","text":"use fire arrows, it's weak to fire","lang":"en","kind":"backseat"}
+{"id":"b08","text":"the key is in the room you skipped","lang":"en","kind":"backseat"}
+{"id":"b09","text":"turn around, the exit is behind you","lang":"en","kind":"backseat"}
+{"id":"b10","text":"you should really upgrade your sword before this fight","lang":"en","kind":"backseat"}
+{"id":"b11","text":"jump on the pipe and then dash","lang":"en","kind":"backseat"}
+{"id":"b12","text":"sell the extra ammo, you don't need it","lang":"en","kind":"backseat"}
+{"id":"b13","text":"why are you not using the double jump??","lang":"en","kind":"backseat","kindAlso":["question"],"borderline":true}
+{"id":"b14","text":"reload before you peek","lang":"en","kind":"backseat"}
+{"id":"b15","text":"take the shortcut on the right","lang":"en","kind":"backseat"}
+{"id":"b16","text":"equip the ring you just found","lang":"en","kind":"backseat"}
+{"id":"b17","text":"go back and talk to the blacksmith","lang":"en","kind":"backseat"}
+{"id":"b18","text":"you missed the secret room again, it was behind the painting","lang":"en","kind":"backseat"}
+{"id":"b19","text":"stop wasting potions on trash mobs","lang":"en","kind":"backseat","tags":["hard-negative"]}
+{"id":"b20","text":"kill him! he's one hit!","lang":"en","kind":"backseat","kindAlso":["hype"],"tags":["in-game-violence","hard-negative"]}
+{"id":"b21","text":"shoot him in the head, he has no helmet","lang":"en","kind":"backseat","tags":["in-game-violence","hard-negative"]}
+{"id":"s01","text":"Wanna become famous? Buy followers, primes and viewers on streamviews dot shop","lang":"en","kind":"spam","flags":["spam"]}
+{"id":"s02","text":"cheap viewers and followers here -> bit.ly/grw-now","lang":"en","kind":"spam","flags":["spam"]}
+{"id":"s03","text":"FREE SKINS!!! claim at csgo-drops.xyz before they run out","lang":"en","kind":"spam","flags":["spam"]}
+{"id":"s04","text":"hey I just started streaming too, come check out my channel twitch.tv/new_streamer_2026","lang":"en","kind":"spam","flags":["spam"]}
+{"id":"s05","text":"Earn $500 a day from home, DM me for the secret method","lang":"en","kind":"spam","flags":["spam"]}
+{"id":"s06","text":"send 0.1 ETH to my wallet and get 0.2 back, limited time only","lang":"en","kind":"spam","flags":["spam"]}
+{"id":"s07","text":"Hi! I'm a graphic designer, I can make you new overlays and emotes for cheap, check my portfolio","lang":"en","kind":"spam","flags":["spam"]}
+{"id":"s08","text":"follow me on insta @daily.giveaways.official for free giveaways","lang":"en","kind":"spam","flags":["spam"]}
+{"id":"s09","text":"free discord nitro: dlscord-gift.com/claim","lang":"en","kind":"spam","flags":["spam"],"tags":["evasion"]}
+{"id":"s10","text":"buy cheap game keys at keyzone dot net, use code STREAM10","lang":"en","kind":"spam","flags":["spam"]}
+{"id":"s11","text":"𝗙𝗥𝗘𝗘 𝗩-𝗕𝗨𝗖𝗞𝗦 at vbux-now dot com","lang":"en","kind":"spam","flags":["spam"],"tags":["evasion"]}
+{"id":"s12","text":"b.u.y f.o.l.l.o.w.e.r.s at r.e.a.l.f.a.n.s dot c.o.m","lang":"en","kind":"spam","flags":["spam"],"tags":["evasion"]}
+{"id":"s13","text":"LOOK AT MY CHANNEL LOOK AT MY CHANNEL LOOK AT MY CHANNEL","lang":"en","kind":"spam","flags":["spam"]}
+{"id":"s14","text":"asdfghjkl asdfghjkl asdfghjkl asdfghjkl asdfghjkl","lang":"en","kind":"spam","borderline":true}
+{"id":"s15","text":"selling accounts with rare skins, whisper me","lang":"en","kind":"spam","flags":["spam"]}
+{"id":"s16","text":"Want more viewers? We grow Twitch channels fast, 100% real, visit growtwitch dot shop","lang":"en","kind":"spam","flags":["spam"],"firstMessage":true}
+{"id":"s17","text":"Hey, your stream could use better overlays! I'm a designer, add me on discord: designsbyk","lang":"en","kind":"spam","flags":["spam"],"firstMessage":true}
+{"id":"s18","text":"Compre seguidores baratos em seguidores-rapidos.com.br","lang":"pt","kind":"spam","flags":["spam"]}
+{"id":"s19","text":"Kaufe billige Follower auf follower-shop punkt de","lang":"de","kind":"spam","flags":["spam"]}
+{"id":"s20","text":"Купить зрителей дешево: twitch-boost.ru","lang":"ru","kind":"spam","flags":["spam"]}
+{"id":"s21","text":"the streamer's merch link is in the panels below the stream","lang":"en","kind":"other","tags":["hard-negative"]}
+{"id":"s22","text":"here's the guide I used: steamcommunity.com/sharedfiles/filedetails/?id=123456","lang":"en","kind":"other","kindAlso":["backseat"],"tags":["hard-negative"],"borderline":true}
+{"id":"s23","text":"you should try Hollow Knight if you like this game","lang":"en","kind":"other","kindAlso":["backseat"],"tags":["hard-negative"]}
+{"id":"o01","text":"brb getting food","lang":"en","kind":"other"}
+{"id":"o02","text":"hi chat 👋","lang":"en","kind":"other"}
+{"id":"o03","text":"good morning from Australia","lang":"en","kind":"other"}
+{"id":"o04","text":"first time here, found you from a clip on youtube","lang":"en","kind":"other","firstMessage":true}
+{"id":"o05","text":"my cat just knocked my drink over lol","lang":"en","kind":"other","kindAlso":["joke"]}
+{"id":"o06","text":"gotta go, have a good stream everyone","lang":"en","kind":"other"}
+{"id":"o07","text":"lurking while I study","lang":"en","kind":"other"}
+{"id":"o08","text":"happy birthday to the mod team ❤️","lang":"en","kind":"other","kindAlso":["hype"]}
+{"id":"o09","text":"thanks for the stream, see you tomorrow","lang":"en","kind":"other"}
+{"id":"o10","text":"this song goes hard","lang":"en","kind":"other","kindAlso":["hype"],"tags":["slang"]}
+{"id":"o11","text":"I've been watching since 2019, time flies","lang":"en","kind":"other"}
+{"id":"o12","text":"the graphics in this game are gorgeous","lang":"en","kind":"other","kindAlso":["hype"]}
+{"id":"o13","text":"I had the same bug in my playthrough","lang":"en","kind":"other"}
+{"id":"o14","text":"night chat, gn","lang":"en","kind":"other"}
+{"id":"o15","text":"just subbed, love the vibes here","lang":"en","kind":"other","kindAlso":["hype"]}
+{"id":"o16","text":"I agree with the mod","lang":"en","kind":"other"}
+{"id":"o17","text":"same","lang":"en","kind":"other"}
+{"id":"o18","text":"hello from Brazil 🇧🇷","lang":"en","kind":"other"}
+{"id":"o19","text":"my wife and I watch every stream together","lang":"en","kind":"other","tags":["identity-mention","hard-negative"]}
+{"id":"o20","text":"I hate mondays","lang":"en","kind":"other","kindAlso":["joke"],"tags":["hard-negative"]}
+{"id":"o21","text":"I hate this level so much","lang":"en","kind":"other","tags":["hard-negative"]}
+{"id":"o22","text":"that boss murdered me 12 times yesterday","lang":"en","kind":"other","tags":["in-game-violence","hard-negative"]}
+{"id":"o23","text":"this game is trash tbh","lang":"en","kind":"other","tags":["hard-negative"]}
+{"id":"o24","text":"the devs should be ashamed of this patch","lang":"en","kind":"other","tags":["hard-negative"]}
+{"id":"o25","text":"I'm going to destroy you in the next match, just wait","lang":"en","kind":"other","kindAlso":["joke"],"tags":["banter","hard-negative"]}
+{"id":"o26","text":"DIE ALREADY you stupid boss","lang":"en","kind":"other","kindAlso":["hype","joke"],"tags":["in-game-violence","hard-negative"]}
+{"id":"o27","text":"people who put pineapple on pizza should be banned lol","lang":"en","kind":"joke","kindAlso":["other"],"tags":["hard-negative"]}
+{"id":"o28","text":"as a gay guy the romance options in this game are great","lang":"en","kind":"other","tags":["identity-mention","hard-negative"]}
+{"id":"o29","text":"as a Muslim I really appreciate the later stream times during Ramadan","lang":"en","kind":"other","tags":["identity-mention","hard-negative"]}
+{"id":"o30","text":"the black knight boss is so hard","lang":"en","kind":"other","tags":["identity-mention","hard-negative"]}
+{"id":"o31","text":"I'm disabled and the accessibility settings in this game are amazing","lang":"en","kind":"other","tags":["identity-mention","hard-negative"]}
+{"id":"o32","text":"swedes are always so polite in this chat","lang":"en","kind":"other","tags":["identity-mention","hard-negative"]}
+{"id":"o33","text":"my internet is dying, see you guys later","lang":"en","kind":"other","tags":["hard-negative"]}
+{"id":"o34","text":"this game's servers always go down on patch day","lang":"en","kind":"other","tags":["hard-negative"]}
+{"id":"o35","text":"the sound design in this game is incredible","lang":"en","kind":"other","kindAlso":["hype"],"tags":["hard-negative"]}
+{"id":"o36","text":"he's frozen in fear lmao","lang":"en","kind":"joke","tags":["hard-negative"]}
+{"id":"o37","text":"you can't hear footsteps at all in this game, terrible sound design","lang":"en","kind":"other","tags":["hard-negative"]}
+{"id":"o38","text":"turn the music up, this song is a banger","lang":"en","kind":"other","kindAlso":["backseat"],"tags":["hard-negative"],"borderline":true}
+{"id":"o39","text":"lol","lang":"en","kind":"joke","kindAlso":["other"]}
+{"id":"i01","text":"no sound?","lang":"en","kind":"question","kindAlso":["other"],"flags":["streamIssue"],"borderline":true}
+{"id":"i02","text":"your mic is muted","lang":"en","kind":"other","flags":["streamIssue"]}
+{"id":"i03","text":"audio is out of sync with the video","lang":"en","kind":"other","flags":["streamIssue"]}
+{"id":"i04","text":"stream keeps buffering for me","lang":"en","kind":"other","flags":["streamIssue"]}
+{"id":"i05","text":"black screen","lang":"en","kind":"other","flags":["streamIssue"]}
+{"id":"i06","text":"game audio is way too loud, we can't hear you","lang":"en","kind":"other","flags":["streamIssue"]}
+{"id":"i07","text":"the stream is super pixelated right now","lang":"en","kind":"other","flags":["streamIssue"]}
+{"id":"i08","text":"is the stream lagging for anyone else?","lang":"en","kind":"question","flags":["streamIssue"]}
+{"id":"i09","text":"we can't hear the game","lang":"en","kind":"other","flags":["streamIssue"]}
+{"id":"i10","text":"webcam froze","lang":"en","kind":"other","flags":["streamIssue"]}
+{"id":"i11","text":"your overlay is covering the minimap","lang":"en","kind":"other","kindAlso":["backseat"],"flags":["streamIssue"],"borderline":true}
+{"id":"i12","text":"mic is peaking hard every time you laugh","lang":"en","kind":"other","flags":["streamIssue"]}
+{"id":"i13","text":"you're frozen","lang":"en","kind":"other","flags":["streamIssue"]}
+{"id":"i14","text":"there's an echo on your mic","lang":"en","kind":"other","flags":["streamIssue"]}
+{"id":"i15","text":"stream died?","lang":"en","kind":"question","kindAlso":["other"],"flags":["streamIssue"]}
+{"id":"i16","text":"can you check your mic? we can't hear you at all","lang":"en","kind":"question","kindAlso":["other"],"flags":["streamIssue","question"]}
+{"id":"i17","text":"no se escucha nada","lang":"es","kind":"other","flags":["streamIssue"]}
+{"id":"i18","text":"kein Ton","lang":"de","kind":"other","flags":["streamIssue"]}
+{"id":"i19","text":"o áudio tá atrasado","lang":"pt","kind":"other","flags":["streamIssue"]}
+{"id":"i20","text":"звука нет","lang":"ru","kind":"other","flags":["streamIssue"]}
+{"id":"i21","text":"音が出てないよ","lang":"ja","kind":"other","flags":["streamIssue"]}
+{"id":"x01","text":"go back to your own country, nobody wants you here","lang":"en","flags":["hateful"]}
+{"id":"x02","text":"women can't play games, get back in the kitchen","lang":"en","flags":["hateful"]}
+{"id":"x03","text":"gay people shouldn't be allowed on my screen, disgusting","lang":"en","flags":["hateful"]}
+{"id":"x04","text":"kill yourself","lang":"en","flags":["hateful"]}
+{"id":"x05","text":"kys loser","lang":"en","flags":["hateful"],"tags":["slang"]}
+{"id":"x06","text":"nobody would miss you if you disappeared","lang":"en","flags":["hateful"]}
+{"id":"x07","text":"you're so ugly it hurts to look at your camera","lang":"en","flags":["hateful"]}
+{"id":"x08","text":"people from your country are all thieves","lang":"en","flags":["hateful"]}
+{"id":"x09","text":"trans people are mentally ill and shouldn't be allowed to stream","lang":"en","flags":["hateful"]}
+{"id":"x10","text":"muslims are all terrorists","lang":"en","flags":["hateful"]}
+{"id":"x11","text":"I know where you live, watch your back","lang":"en","flags":["hateful"]}
+{"id":"x12","text":"you people are animals","lang":"en","flags":["hateful"]}
+{"id":"x13","text":"disabled people shouldn't play online, they ruin every match","lang":"en","flags":["hateful"]}
+{"id":"x14","text":"she only gets viewers because she's a woman, zero talent","lang":"en","flags":["hateful"]}
+{"id":"x15","text":"this streamer is a fat disgusting pig","lang":"en","flags":["hateful"]}
+{"id":"x16","text":"jews control the whole gaming industry","lang":"en","flags":["hateful"]}
+{"id":"x17","text":"black people can't be good at strategy games","lang":"en","flags":["hateful"]}
+{"id":"x18","text":"old people shouldn't stream, just die already","lang":"en","flags":["hateful"]}
+{"id":"x19","text":"your accent is disgusting, learn real english","lang":"en","flags":["hateful"]}
+{"id":"x20","text":"shut up you worthless idiot","lang":"en","flags":["hateful"]}
+{"id":"x21","text":"trash streamer, uninstall life","lang":"en","flags":["hateful"],"tags":["evasion"]}
+{"id":"x22","text":"k y s","lang":"en","flags":["hateful"],"tags":["evasion"]}
+{"id":"x23","text":"unalive yourself","lang":"en","flags":["hateful"],"tags":["evasion"]}
+{"id":"x24","text":"g0 b4ck t0 y0ur c0untry","lang":"en","flags":["hateful"],"tags":["evasion"]}
+{"id":"x25","text":"k.i.l.l y.o.u.r.s.e.l.f","lang":"en","flags":["hateful"],"tags":["evasion"]}
+{"id":"x26","text":"las mujeres no saben jugar, vuelve a la cocina","lang":"es","flags":["hateful"]}
+{"id":"x27","text":"Frauen gehören nicht an den PC, zurück in die Küche","lang":"de","flags":["hateful"]}
+{"id":"x28","text":"retourne dans ton pays, personne ne veut de toi ici","lang":"fr","flags":["hateful"]}
+{"id":"x29","text":"vai se matar, ninguém gosta de você","lang":"pt","flags":["hateful"]}
+{"id":"x30","text":"убей себя, ты никому не нужен","lang":"ru","flags":["hateful"]}
+{"id":"x31","text":"homo's horen niet op twitch","lang":"nl","flags":["hateful"]}
+{"id":"x32","text":"gå och dö, ingen vill ha dig här","lang":"sv","flags":["hateful"]}
+{"id":"x33","text":"kendi ülkene geri dön","lang":"tr","flags":["hateful"]}
+{"id":"x34","text":"wracaj do swojego kraju, nikt cię tu nie chce","lang":"pl","flags":["hateful"]}
+{"id":"x35","text":"死ね","lang":"ja","flags":["hateful"]}
+{"id":"x36","text":"everyone in this chat is a braindead loser","lang":"en","flags":["hateful"],"borderline":true}
+{"id":"x37","text":"french players are the worst lol","lang":"en","flags":["hateful"],"tags":["banter"],"borderline":true}
+{"id":"x38","text":"trash streamer","lang":"en","flags":["hateful"],"tags":["banter"],"borderline":true}
+{"id":"n01","text":"you're so bad it's actually embarrassing","lang":"en","kind":"joke","kindAlso":["other"],"tags":["banter","hard-negative"],"borderline":true}
+{"id":"n02","text":"L streamer","lang":"en","kind":"joke","kindAlso":["other"],"tags":["slang","banter","hard-negative"],"borderline":true}
+{"id":"n03","text":"who asked","lang":"en","kind":"joke","kindAlso":["other"],"tags":["slang","banter","hard-negative"],"borderline":true}
+{"id":"n04","text":"cry about it","lang":"en","kind":"joke","kindAlso":["other"],"tags":["slang","banter","hard-negative"],"borderline":true}
+{"id":"n05","text":"you're washed","lang":"en","kind":"joke","kindAlso":["other"],"tags":["slang","banter","hard-negative"]}
+{"id":"n06","text":"damn that's a sick shot","lang":"en","kind":"hype","tags":["slang","hard-negative"]}
+{"id":"n07","text":"this is so mid","lang":"en","kind":"other","kindAlso":["joke"],"tags":["slang","hard-negative"]}
+{"id":"n08","text":"he's cooked chat","lang":"en","kind":"joke","kindAlso":["other"],"tags":["slang","hard-negative"]}
+{"id":"n09","text":"shut up backseaters, let him play","lang":"en","kind":"other","tags":["hard-negative"],"borderline":true}
+{"id":"n10","text":"this game is literally cancer","lang":"en","kind":"other","tags":["hard-negative"],"borderline":true}
+{"id":"l01","text":"hola a todos desde México","lang":"es","kind":"other"}
+{"id":"l02","text":"qué jugada tan buena","lang":"es","kind":"hype"}
+{"id":"l03","text":"¿qué sensibilidad usas?","lang":"es","kind":"question","flags":["question"]}
+{"id":"l04","text":"ve a la izquierda","lang":"es","kind":"backseat"}
+{"id":"l05","text":"jajajajaja","lang":"es","kind":"joke"}
+{"id":"l06","text":"bom dia chat","lang":"pt","kind":"other"}
+{"id":"l07","text":"que jogada absurda","lang":"pt","kind":"hype"}
+{"id":"l08","text":"qual é o seu rank?","lang":"pt","kind":"question","flags":["question"]}
+{"id":"l09","text":"kkkkkkkk","lang":"pt","kind":"joke"}
+{"id":"l10","text":"wie heißt das Spiel?","lang":"de","kind":"question","flags":["question"]}
+{"id":"l11","text":"geh nach rechts","lang":"de","kind":"backseat"}
+{"id":"l12","text":"was für ein Clutch!","lang":"de","kind":"hype"}
+{"id":"l13","text":"c'est quoi ce jeu ?","lang":"fr","kind":"question","flags":["question"]}
+{"id":"l14","text":"trop fort !","lang":"fr","kind":"hype"}
+{"id":"l15","text":"mdr","lang":"fr","kind":"joke"}
+{"id":"l16","text":"привет всем","lang":"ru","kind":"other"}
+{"id":"l17","text":"какой у тебя ранг?","lang":"ru","kind":"question","flags":["question"]}
+{"id":"l18","text":"こんにちは","lang":"ja","kind":"other"}
+{"id":"l19","text":"ナイス！","lang":"ja","kind":"hype"}
+{"id":"l20","text":"ㅋㅋㅋㅋㅋ","lang":"ko","kind":"joke"}
+{"id":"l21","text":"와 대박","lang":"ko","kind":"hype"}
+{"id":"l22","text":"goedemorgen chat","lang":"nl","kind":"other"}
+{"id":"l23","text":"welke muis gebruik je?","lang":"nl","kind":"question","flags":["question"]}
+{"id":"l24","text":"hej från Sverige","lang":"sv","kind":"other"}
+{"id":"l25","text":"vilket galet drag!","lang":"sv","kind":"hype"}
+{"id":"l26","text":"selam millet","lang":"tr","kind":"other"}
+{"id":"l27","text":"jaki masz monitor?","lang":"pl","kind":"question","flags":["question"]}
+{"id":"l28","text":"che giocata pazzesca","lang":"it","kind":"hype"}
+{"id":"l29","text":"usa la poción ya","lang":"es","kind":"backseat"}
+{"id":"l30","text":"Ich hasse dieses Level","lang":"de","kind":"other","tags":["hard-negative"]}
+{"id":"r01","text":"yes that's the final boss","lang":"en","kind":"other","reply":{"author":"viewer_88","text":"is this the final boss?"}}
+{"id":"r02","text":"same, it happened to me too","lang":"en","kind":"other","reply":{"author":"viewer_12","text":"my game crashed right at this part"}}
+{"id":"r03","text":"go back where you came from","lang":"en","flags":["hateful"],"reply":{"author":"viewer_40","text":"greetings from Nigeria!"}}
+{"id":"r04","text":"no one cares","lang":"en","kind":"other","kindAlso":["joke"],"tags":["hard-negative"],"borderline":true,"reply":{"author":"viewer_7","text":"I just got my first job today!"}}
+{"id":"r05","text":"congrats!! that's huge","lang":"en","kind":"hype","kindAlso":["other"],"reply":{"author":"viewer_7","text":"I just got my first job today!"}}
+{"id":"r06","text":"it's in the settings under accessibility","lang":"en","kind":"other","reply":{"author":"viewer_31","text":"how do you turn on subtitles?"}}
+{"id":"r07","text":"that's because you people ruin everything","lang":"en","flags":["hateful"],"reply":{"author":"viewer_55","text":"proud to be the first Somali streamer in this game's top 100"}}
+{"id":"r08","text":"nah he's right, you should grab the key first","lang":"en","kind":"backseat","reply":{"author":"viewer_19","text":"streamer go get the key"}}

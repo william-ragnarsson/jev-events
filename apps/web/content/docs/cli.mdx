@@ -1,0 +1,83 @@
+---
+title: CLI
+description: Watch Jev label a live stream in your terminal, and sign in bot accounts.
+icon: SquareTerminal
+---
+
+The `jev-events` command ships with the library, so `npx` runs it without installing anything. It needs `TYPESAFE_API_KEY` in your environment.
+
+```bash
+export TYPESAFE_API_KEY=...
+npx jev-events watch twitch:<channel>
+```
+
+## `watch`
+
+```txt
+jev-events watch <source> [questions] [options]
+```
+
+Prints one row per item with each answer, its probability and how long Jev took, then a summary of requests, tokens and estimated spend when you press Ctrl-C. Messages Jev finds likely hateful (p ≥ 0.8) are hidden in the table.
+
+### Sources
+
+| Source | What it reads |
+| --- | --- |
+| `twitch:<channel>` | Any public Twitch chat, no login needed |
+| `bluesky` or `bluesky:<word>,<word>` | The Bluesky firehose, optionally only posts with these words |
+| `stdin` | One item per line, e.g. `tail -f app.log \| npx jev-events watch stdin -a "..."` |
+| `webhook` or `webhook:<port>` | POST `{"text": "..."}` to `http://127.0.0.1:8787/` |
+
+### Questions
+
+Twitch chat and Bluesky posts get a sensible default; other sources need at least one question.
+
+| Flag | |
+| --- | --- |
+| `-a, --ask "label=Question?"` | A yes/no question. The label is optional. Repeat for more. |
+| `-c, --choice "Question?" -o a,b,c` | Pick one of these labels |
+| `-r, --recipe chat.hateful` | A built-in [recipe](/docs/recipes). Repeatable. |
+
+### Options
+
+| Flag | Default | |
+| --- | --- | --- |
+| `-f, --filter <regex>` | | Only judge items that match |
+| `--min <0-1>` | 0.5 | Yes/no answers count from this probability |
+| `--only` | | Only print items where something fired |
+| `--rate <n>` | 8 | Jev requests per second |
+| `--context <n>` | per source | Preceding items shown to Jev as context |
+| `--lang <codes>` | | Bluesky only: posts in these languages, e.g. `en` |
+| `-m, --model <id>` | `jev-latest` | The Jev model |
+| `--json` | | Print JSON lines instead of a table |
+
+### Examples
+
+```bash
+# What is chat doing, and is any of it hateful? (the default questions)
+npx jev-events watch twitch:<channel>
+
+# Your own question, only showing hits
+npx jev-events watch twitch:<channel> --only \
+  --ask "streamIssue=Is this about the stream's audio or video?"
+
+# Pick a label
+npx jev-events watch twitch:<channel> \
+  -c "What is this message about?" -o "gameplay,streamer,other"
+
+# Logs
+tail -f app.log | npx jev-events watch stdin \
+  --ask "Is this an error a human should look at?"
+
+# Bluesky posts about a topic, as JSON lines
+npx jev-events watch bluesky:typescript --lang en --json \
+  --ask "Is this person asking for help?"
+```
+
+## `auth`
+
+```bash
+npx jev-events auth twitch --client-id <id> [--scopes "<scope> <scope>"]
+```
+
+Signs a bot account in with Twitch's device code flow and saves the tokens to `.jev-events/credentials.json`. See [signing in a bot](/docs/integrations/twitch#sign-in-a-bot).

@@ -1,0 +1,36 @@
+---
+title: Anything else
+description: Logs, queues, support tickets, webhooks and public firehoses. If it produces text, it's a stream.
+icon: Webhook
+---
+
+Jev Events isn't limited to its connectors. Anything that produces text over time can be a source, and your own functions handle the events.
+
+<Snippet name="custom" title="any-stream.ts" />
+
+## Ideas
+
+| Stream | Source | A question to ask |
+| --- | --- | --- |
+| Application logs | `from(readline)` or `stdin` in the CLI | Does this line describe a failure a human should look at? |
+| Support tickets | `webhook({ map })` from your help desk | Is the customer angry? Is this a bug report? |
+| Product reviews | `from(rows)` over a database cursor | Does this review mention a specific missing feature? |
+| Contact forms | `webhook({ map })` from your backend | Is this a sales lead, a support request or spam? |
+| Bluesky | `bluesky({ keywords })` from `jev-events/public` | Is this post about our product, and is it a complaint? |
+
+## Public streams
+
+`jev-events/public` has read-only sources that need no login. They're built for demos, the CLI and trying questions on real traffic.
+
+```ts
+import { listen, noul } from "jev-events";
+import { bluesky } from "jev-events/public";
+
+const posts = listen(bluesky({ keywords: ["typescript"], langs: ["en"] }), {
+  question: noul("Is this post asking for help with a TypeScript problem?"),
+});
+```
+
+## Build a connector
+
+The [sources guide](/docs/concepts/sources#write-your-own) shows a complete source in about 30 lines, and `defineAction()` turns a platform API call into a [native action](/docs/concepts/actions#your-own-actions) with dry-run and protected users built in. Connectors for YouTube, Discord, Gmail and Google Calendar are [in development](/docs/roadmap).

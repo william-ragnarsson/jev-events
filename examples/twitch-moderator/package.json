@@ -1,0 +1,12 @@
+{
+  "name": "@jev-events/example-twitch-moderator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --conditions=source --import tsx index.ts"
+  },
+  "dependencies": {
+    "@jev-events/twitch": "^0.1.0",
+    "jev-events": "^0.1.0"
+  }
+}

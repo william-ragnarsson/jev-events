@@ -1,0 +1,45 @@
+---
+title: Benchmarks
+description: How well Jev labels live chat, measured on a labeled dataset that lives in the repository.
+icon: Gauge
+---
+
+Every accuracy number on this site comes from here. The dataset, the scoring code and the runner are open source, so you can check them and run them on your own key.
+
+## The dataset
+
+`evals/datasets/chat.jsonl` holds <Dataset field="items" /> labeled chat messages, written for this project to read like real Twitch chat. None are copied from real people. It's built to be hard:
+
+- Hateful messages include evasions, like spaced-out or look-alike spellings, and messages in other languages.
+- Hard negatives look alarming but aren't: trash talk about a boss fight, in-game violence, banter between regulars, and mentions of identity that attack no one.
+- Slang, emotes and sarcasm, because chat rarely writes full sentences.
+- <Dataset field="nonEnglish" /> messages in <Dataset field="otherLanguages" /> languages other than English. English is Jev's primary language, so this shows what to expect elsewhere.
+- Stream problems ("no sound", "you're frozen") next to messages that only look like them.
+
+Each message carries the right answers for the chat recipes: a `kind` where one fits, and yes/no flags for `hateful`, `question`, `streamIssue` and `spam`. <Dataset field="borderline" /> messages that reasonable moderators could disagree on are marked borderline and left out of the scores, so the numbers measure Jev rather than the annotator. They are still in the file.
+
+## Method
+
+- **One request per message, as the library sends it** (`single`). This is what `listen()` does by default: a named message with its facts, and questions pointed at it.
+- **Bare text** (`plain`). The text alone and the recipes unchanged, to check that the structure helps.
+- **Batched** (`batched-8`). Eight messages in one request with one question per message, to see whether batching costs accuracy.
+
+Each message is asked once and scored on that answer, and flags are reported at five thresholds instead of one picked for the best result.
+
+## Results
+
+<BenchmarkReport />
+
+## Run it yourself
+
+```bash
+git clone https://github.com/william-popmie/jev-events && cd jev-events
+npm ci
+export TYPESAFE_API_KEY=...
+npm run eval -- --mode all     # writes evals/results/*.json
+npm run eval:report            # publishes them to this page
+```
+
+`npm run eval -- --mock` runs the whole pipeline offline with a keyword stand-in for Jev. Its numbers mean nothing and are never published.
+
+To test on your own chat, `npm run eval:record -- <channel> --count 300` saves 300 messages from a live channel, without usernames, to a local file that git ignores. Label them in the same format, then run `npm run eval -- --dataset raw/<file name>`.

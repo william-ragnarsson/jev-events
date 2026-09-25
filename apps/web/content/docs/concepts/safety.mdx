@@ -1,0 +1,94 @@
+---
+title: Safety and limits
+description: Dry-run, protected users, review bands, budgets, rate limits, stale items and the audit log.
+icon: ShieldCheck
+---
+
+Automated moderation fails in public. The defaults assume you would rather miss a message than time out a regular.
+
+<Snippet name="safety" title="safe-defaults.ts" />
+
+Until you arm it, the log shows what would have happened:
+
+```txt
+[jev-events] [dry-run] would timeout viewer_42 for 600s (hateful p=0.97)
+```
+
+## Dry-run until you arm it
+
+Every listener starts with `dryRun: true`. Native actions log what they would do and emit an `action` event with status `dry-run`; nothing reaches the platform. Run it on your real chat for a while, read the log, then pass `dryRun: false`.
+
+Arming a listener whose source can't act, such as an anonymous Twitch chat, fails at `start()` with a clear error instead of silently doing nothing.
+
+## Protected users
+
+Native actions never run on items from privileged users. For Twitch that's the broadcaster, moderators, VIPs and Twitch staff. Add your own rules with `protect`, for example regulars or partner bots:
+
+```ts
+listen(source, questions, {
+  protect: (item) => regulars.has(item.author.login),
+});
+```
+
+If `protect` throws, the item is treated as protected. The action is reported as `skipped` with the reason `protected user`.
+
+## Review bands
+
+Give any policy a `review` threshold, and answers between `review` and `min` emit a `review` event instead of acting. See [the review band](/docs/concepts/questions#the-review-band).
+
+## Budgets
+
+`budget: { inputTokensPerDay }` stops judging once that many input tokens were spent in the current UTC day. Items that arrive after that are dropped with reason `budget` until the next day starts. Jev's list price is $0.042 per million input tokens, so 20 million tokens is about $0.84 a day.
+
+To cap several listeners together, share one `DailyBudget`:
+
+```ts
+const budget = new DailyBudget(50_000_000);
+const chat = listen(twitch.chat("mychannel"), chatQuestions, { budget });
+const inbox = listen(webhook(), ticketQuestions, { budget });
+```
+
+## Rate limits and queues
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `rate.perSecond` | 18 | Sustained requests per second. Jev's published limit is 1,200 a minute. |
+| `rate.burst` | 20 | Requests allowed at once after a quiet spell |
+| `rate.concurrency` | 16 | Requests in flight at once |
+| `maxQueue` | 1000 | Items waiting for a slot. Beyond it the oldest are dropped with reason `overflow`. |
+| `maxLagMs` | per source; 10 s for Twitch | Items that waited longer are dropped with reason `stale` instead of being acted on late |
+| `timeoutMs` | the SDK's | Per-attempt timeout for a Jev request |
+
+A timeout for a message from two minutes ago confuses everyone, so for chat it's better to skip than to be late.
+
+## Floods and filters
+
+`cache: true` reuses the answers for identical text for 60 seconds, so a copy-paste flood costs one request. The cache is keyed on text alone and ignores context. `cache: { ttlMs, max }` tunes it.
+
+`filter` skips items before they are judged or cost anything. Twitch chat already skips `!commands` and well-known bots:
+
+```ts
+listen(source, questions, { filter: (item) => item.text.length > 3 });
+```
+
+## Audit log
+
+`logTo(path)` appends every judgment, review, action, drop and error to a JSONL file, with probabilities, latency and token usage. Pass `{ includeText: false }` to keep ids and answers only.
+
+Each record is one line in the file. Here is one, spread out to read:
+
+```json
+{
+  "at": "2026-09-24T18:03:11.482Z",
+  "type": "action",
+  "item": { "id": "b1f…", "author": "viewer_42", "text": "…" },
+  "action": "twitch.timeout",
+  "description": "timeout viewer_42 for 600s",
+  "status": "dry-run",
+  "trigger": { "event": "hateful", "question": "hateful", "probability": 0.97 }
+}
+```
+
+## Stats
+
+`listener.stats()` returns counts of items received, judged, cached, queued and dropped by reason, actions by status, errors, p50 and p95 latency, token usage and estimated spend.

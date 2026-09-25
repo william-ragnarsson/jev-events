@@ -1,0 +1,63 @@
+---
+title: Questions and events
+description: How choice, noul and score questions become typed events, and how thresholds decide when they fire.
+icon: MessageCircleQuestionMark
+---
+
+The second argument to `listen()` is an object of questions. Jev answers all of them about each item, in one request. Jev Events re-exports TypeSafe's three question builders, so you don't need a second import.
+
+| Builder | Answers | Events it creates |
+| --- | --- | --- |
+| `choice(instructions, labels)` | Which one label fits, with a probability for every label | `"<id>:<label>"` for each label |
+| `noul(instructions, criteria?)` | The probability that the answer is yes | `"<id>"` |
+| `score(instructions, levels)` | A position on your ordered scale, from 0 to levels − 1 | `"<id>"` |
+
+<Snippet name="questions" title="questions.ts" />
+
+Event names and payloads are inferred from the questions. `e.answers.kind.probabilities` is typed with your labels, and listening for an event that doesn't exist is a compile error, as the last line above shows.
+
+## When an event fires
+
+Pass a policy between the event name and the handler:
+
+| Question | Default | Policy |
+| --- | --- | --- |
+| choice | Fires for the label Jev chose | `{ min: 0.8 }` fires when that label's probability reaches 0.8, even if it wasn't the top choice |
+| noul | Fires at p ≥ 0.5 | `{ min: 0.9 }` |
+| score | Fires at the middle of the scale | `{ atLeast: 2 }` |
+
+Pick thresholds by what a mistake costs. A wrong highlight is cheap, so fire early. A wrong timeout is public, so demand more certainty and send the uncertain middle to a person.
+
+## The review band
+
+Add `review` to any policy. When the answer lands between `review` and `min` (or `atLeast`), the handler doesn't run. The listener emits a `review` event instead, so a person can decide:
+
+```ts
+chat.on("hateful", { min: 0.9, review: 0.6 }, twitch.timeout({ seconds: 600 }));
+chat.on("review", (e) => modQueue.add(e)); // 0.6 ≤ p < 0.9: ask a human
+```
+
+## Special events
+
+Besides outcome events, every listener emits these:
+
+| Event | When | Payload |
+| --- | --- | --- |
+| `judged` | Every item Jev answered | `item`, `answers`, `latencyMs`, `usage`, `cached`, `dryRun`, `protected` |
+| `review` | An answer fell in a review band | The same, plus `trigger` and the `handler` that didn't run |
+| `action` | A native action ran, would have run, or was skipped | `action`, `description`, `status`, `reason` |
+| `dropped` | An item was skipped before judging | `item`, `reason`: `filtered`, `stale`, `overflow`, `budget` or `stopped` |
+| `error` | Something failed; the listener keeps going | `error`, `phase`: `source`, `judge`, `handler` or `action` |
+
+## Writing good questions
+
+These follow TypeSafe's own guidance, which is worth [reading in full](https://docs.typesafe.ai/concepts/how-to-build-with-system-one).
+
+- **Ask one narrow judgment per question.** "Is this hateful?" and "Is this spam?" are two questions, not one choice between them, when a message can be both.
+- **Describe every outcome.** Labels and criteria are shown to Jev. `"Tells the streamer how to play, without being asked"` beats `"backseat"`.
+- **Leave a way out.** Give a choice an `other` label, so Jev isn't forced into a wrong one.
+- **Put the meaning in the question.** Question ids like `kind` are for your code and aren't sent to Jev.
+- **Keep math and dates in code.** Compute "starts in 20 minutes" or "5th message this minute" yourself and pass it as a fact.
+- **Ask independent questions together.** They are answered in parallel in the same request and can't see each other's answers.
+
+Or start from a [recipe](/docs/recipes), which already does all of this.

@@ -1,0 +1,68 @@
+---
+title: Introduction
+description: Jev Events turns live chat, comments, inboxes and any other stream into typed events you can act on.
+icon: BookOpen
+---
+
+Jev Events is an open-source TypeScript library. It connects to a stream, asks [TypeSafe's Jev](https://docs.typesafe.ai) a question about every item as it arrives, and turns the answers into typed events. You handle each event with a built-in platform action, such as timing out a Twitch chatter, or with your own code.
+
+<Snippet name="hero" title="moderator.ts" />
+
+## Why it exists
+
+Jev answers narrow, typed questions about text: which of these labels fits, how likely is yes, where on this scale. Input costs $0.042 per million tokens and output is free, which makes it affordable to ask about every single message in a busy chat.
+
+The call itself is the easy part. Around it you need sockets and sign-in, reconnects, rate limits, a queue that skips messages that waited too long, a daily budget, the platform's moderation API, and a guarantee that your bot never times out a moderator. Jev Events is that part, tested once so you don't rebuild it for every project.
+
+## How it works
+
+<Steps>
+<Step>
+
+**Pick a source.** `twitch.chat("mychannel")`, a webhook, or any async iterable. Every item arrives as the same small `Item` shape.
+
+</Step>
+<Step>
+
+**Ask questions.** A `choice` between labels, a yes/no `noul`, or a `score` on your own scale. Several questions are answered together in one request.
+
+</Step>
+<Step>
+
+**Handle typed events.** Event names come from your questions, so `"kind:question"` exists only if `kind` has a `question` label.
+
+</Step>
+<Step>
+
+**Act.** Built-in actions stay in dry-run until you arm them and never touch moderators. Your own functions run as soon as an outcome fires.
+
+</Step>
+</Steps>
+
+## What's available
+
+| | Status |
+| --- | --- |
+| Twitch chat: read any channel, moderate your own | Available |
+| Any async iterable, webhooks, the Bluesky firehose | Available |
+| CLI: `npx jev-events watch` | Available |
+| YouTube live chat and comments | In development |
+| Discord | In development |
+| Gmail and Google Calendar | In development |
+
+See the [roadmap](/docs/roadmap) for what's next.
+
+## Where it runs
+
+In your own process, with your own credentials. Jev Events has no servers: items go to TypeSafe's API to be judged, and actions go straight to the platform. That's also why it's a library and not a hosted service.
+
+<Cards>
+  <Card title="Quickstart" href="/docs/quickstart" description="Label a live Twitch chat in five minutes." />
+  <Card title="Questions" href="/docs/concepts/questions" description="choice, noul and score, and the events they create." />
+  <Card title="Twitch" href="/docs/integrations/twitch" description="Sign a bot in and moderate your channel." />
+  <Card title="Recipes" href="/docs/recipes" description="Ready-made questions for chat, comments, email and calendars." />
+</Cards>
+
+<Callout title="A community project">
+  Jev Events is built on TypeSafe's public API. It is not made by, affiliated with or endorsed by TypeSafe.
+</Callout>

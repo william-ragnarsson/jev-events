@@ -1,0 +1,22 @@
+{
+  "items": 278,
+  "borderline": 18,
+  "languages": 13,
+  "nonEnglish": 48,
+  "flags": {
+    "hateful": 40,
+    "question": 36,
+    "streamIssue": 21,
+    "spam": 19
+  },
+  "tags": {
+    "banter": 18,
+    "slang": 25,
+    "hard-negative": 56,
+    "emote": 9,
+    "sarcasm": 5,
+    "in-game-violence": 4,
+    "evasion": 8,
+    "identity-mention": 6
+  }
+}

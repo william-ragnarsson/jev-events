@@ -1,0 +1,19 @@
+{
+  "title": "Docs",
+  "pages": [
+    "index",
+    "quickstart",
+    "---Concepts---",
+    "...concepts",
+    "---Integrations---",
+    "...integrations",
+    "---Reference---",
+    "recipes",
+    "cli",
+    "testing",
+    "benchmarks",
+    "---Project---",
+    "roadmap",
+    "faq"
+  ]
+}

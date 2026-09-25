@@ -1,0 +1,41 @@
+---
+title: FAQ
+description: Cost, privacy, accuracy, languages and who's behind the project.
+icon: CircleQuestionMark
+---
+
+## Is this made by TypeSafe?
+
+No. Jev Events is an independent open-source project that uses TypeSafe's public API. It isn't affiliated with or endorsed by TypeSafe. Jev is TypeSafe's model; you need your own TypeSafe API key.
+
+## What does it cost?
+
+The library is free and MIT licensed. You pay TypeSafe for Jev: $0.042 per million input tokens, with output free, at the time of writing. See [TypeSafe's models page](https://docs.typesafe.ai/models) for the current price.
+
+What one item costs depends on your questions and how much context you send. `listener.stats()` reports tokens and estimated spend as you go, and `budget` puts a hard daily cap on it. The live feed on the home page shows what labeling a real Twitch chat costs, measured as it runs.
+
+## Where does my data go?
+
+Items go from your process to TypeSafe's API to be judged, and actions go from your process to the platform. Jev Events has no servers and collects nothing. Your credentials stay on your machine or in your environment.
+
+TypeSafe's own policies cover how they handle requests. Jev sees the item's text, author name, roles and facts, plus any context you add; `item.raw`, the original platform payload, is never sent.
+
+## Does it scrape anything?
+
+No. Every connector uses the platform's official API or public protocol.
+
+## How accurate is it?
+
+It depends on the question and your threshold. The [benchmarks](/docs/benchmarks) report precision and recall at several thresholds for the chat recipes. Measure your own questions on your own data before acting on them automatically, and use a review band where a mistake is costly.
+
+## Which languages work?
+
+English is Jev's primary language. The benchmark dataset includes messages in <Dataset field="otherLanguages" /> other languages and reports them as a separate slice, so you can see what to expect.
+
+## Which runtimes are supported?
+
+Node.js 22 and newer. The library needs a server-side runtime because your API keys must never reach a browser. Other runtimes may work but aren't tested.
+
+## Can it run in a browser or at the edge?
+
+Not today. Sources hold long-lived sockets, which need a persistent process. Run it on a small server or a container; the home page's live feed runs in one.

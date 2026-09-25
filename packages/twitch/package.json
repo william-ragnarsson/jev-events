@@ -1,0 +1,45 @@
+{
+  "name": "@jev-events/twitch",
+  "version": "0.1.0",
+  "description": "Twitch chat for Jev Events: EventSub chat, timeouts, bans, deletes, warnings, replies and clips.",
+  "type": "module",
+  "license": "MIT",
+  "author": "William Ragnarsson",
+  "homepage": "https://jevevents.dev/docs/integrations/twitch",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/william-popmie/jev-events.git",
+    "directory": "packages/twitch"
+  },
+  "bugs": {
+    "url": "https://github.com/william-popmie/jev-events/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "keywords": [
+    "jev",
+    "jev-events",
+    "twitch",
+    "moderation",
+    "chat",
+    "eventsub"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "jev-events": "^0.1.0"
+  }
+}

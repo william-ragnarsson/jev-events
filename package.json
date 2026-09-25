@@ -1,0 +1,36 @@
+{
+  "name": "jev-events-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "examples/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -b packages/core packages/twitch",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "changeset": "changeset",
+    "version-packages": "changeset version && npm install --package-lock-only",
+    "release": "npm run build && changeset publish",
+    "eval": "node --conditions=source --import tsx evals/run.ts",
+    "eval:report": "node --conditions=source --import tsx evals/report.ts",
+    "eval:record": "node --conditions=source --import tsx evals/record.ts",
+    "site:data": "node --conditions=source --import tsx scripts/site-data.ts",
+    "mock-jev": "node --conditions=source --import tsx scripts/mock-jev.ts"
+  },
+  "devDependencies": {
+    "@changesets/cli": "3.0.3",
+    "@types/node": "^24.0.0",
+    "@types/ws": "8.18.1",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "^5.0.1",
+    "ws": "8.21.3"
+  }
+}

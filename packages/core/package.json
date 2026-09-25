@@ -1,0 +1,63 @@
+{
+  "name": "jev-events",
+  "version": "0.1.0",
+  "description": "Turn any stream into typed, semantic events. Built on TypeSafe's Jev.",
+  "type": "module",
+  "license": "MIT",
+  "author": "William Ragnarsson",
+  "homepage": "https://jevevents.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/william-popmie/jev-events.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/william-popmie/jev-events/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./public": {
+      "source": "./src/public/index.ts",
+      "types": "./dist/public/index.d.ts",
+      "default": "./dist/public/index.js"
+    },
+    "./testing": {
+      "source": "./src/testing.ts",
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "^0.6.0"
+  },
+  "bin": {
+    "jev-events": "./dist/cli/main.js"
+  },
+  "keywords": [
+    "jev",
+    "typesafe",
+    "ai",
+    "moderation",
+    "twitch",
+    "youtube",
+    "discord",
+    "gmail",
+    "streaming",
+    "events",
+    "classification"
+  ]
+}
