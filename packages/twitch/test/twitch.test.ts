@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebSocketServer, type WebSocket as ServerSocket } from "ws";
 
-import { listen, noul, silentLogger, type ActionEvent } from "jev-events";
+import { listen, noul, silentLogger, type ActionEvent, type ErrorEvent } from "jev-events";
 import { itemFromIrc, parseIrcLine, type TwitchChatItem } from "jev-events/public";
 import { mockJev } from "jev-events/testing";
 
@@ -225,6 +225,41 @@ describe("twitch.chat with auth", () => {
     expect(ban?.url).toContain("moderator_id=999");
     expect(ban?.body).toEqual({ data: { user_id: "42", duration: 60, reason: "jev-events: hateful (97%)" } });
     expect(fake.calls.find((call) => call.url.includes("/moderation/chat"))?.method).toBe("DELETE");
+  });
+
+  it("stops with a clear error when Twitch revokes the subscription", async () => {
+    const fake = await fakeTwitch();
+    const source = twitch.chat("mychannel", { auth: withTokens({ clientId: "cid", accessToken: "token" }), eventsubUrl: fake.url });
+    const errors: ErrorEvent[] = [];
+    const chat = listen(source, { hateful }, { client: mockJev(() => ({ hateful: 0 })), log: silentLogger }).on("error", (e) => {
+      errors.push(e);
+    });
+    await chat.start();
+    const finished = chat.run();
+
+    // What Twitch sends when the user disconnects the app or changes their password.
+    const socket = fake.sockets[0] as ServerSocket;
+    socket.send(
+      JSON.stringify({
+        metadata: {
+          message_id: "revocation-1",
+          message_type: "revocation",
+          message_timestamp: new Date().toISOString(),
+          subscription_type: "channel.chat.message",
+        },
+        payload: { subscription: { type: "channel.chat.message", status: "authorization_revoked" } },
+      }),
+    );
+
+    expect((await finished).errors).toBe(1);
+    expect(errors.map((e) => [e.phase, (e.error as Error).message])).toEqual([
+      ["source", "Twitch revoked the chat subscription (authorization_revoked). Sign in again: npx jev-events auth twitch"],
+    ]);
+    await waitFor(() => socket.readyState === socket.CLOSED);
+    // It must not keep reconnecting with a revoked token; the first retry would come after 1s.
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    expect(fake.sockets).toHaveLength(1);
+    await fake.close();
   });
 
   it("reads anonymously without auth, and only allows dry-run actions", async () => {

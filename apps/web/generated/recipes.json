@@ -137,6 +137,17 @@
     "criteria": null
   },
   {
+    "usage": "recipes.calendar.important",
+    "group": "calendar",
+    "id": "important",
+    "type": "noul",
+    "instructions": "Is this event important to the attendee?",
+    "criteria": {
+      "true": "Missing it would have real consequences: a decision, deadline, interview, client, doctor or someone relying on them",
+      "false": "Routine, optional or large broadcast events, and events they could skip or catch up on later"
+    }
+  },
+  {
     "usage": "recipes.calendar.needsPrep",
     "group": "calendar",
     "id": "needsPrep",
@@ -164,6 +175,40 @@
       "social": "A social or personal event with other people",
       "focus": "Time blocked for focused work",
       "personal": "An appointment or reminder for the owner only",
+      "other": "Anything else"
+    }
+  },
+  {
+    "usage": "recipes.team.needsAnswer",
+    "group": "team",
+    "id": "needsAnswer",
+    "type": "noul",
+    "instructions": "Is someone waiting for an answer to this message?",
+    "criteria": {
+      "true": "It asks a question, asks for a decision or asks someone to do something",
+      "false": "Updates, chatter, thanks and messages that are just for information"
+    }
+  },
+  {
+    "usage": "recipes.team.urgent",
+    "group": "team",
+    "id": "urgent",
+    "type": "noul",
+    "instructions": "Is this message about something urgent, such as an outage, a blocker or a deadline today?",
+    "criteria": null
+  },
+  {
+    "usage": "recipes.team.kind",
+    "group": "team",
+    "id": "kind",
+    "type": "choice",
+    "instructions": "What is this message mainly doing?",
+    "criteria": {
+      "question": "Asks a question",
+      "request": "Asks someone to do something",
+      "incident": "Reports an outage, a bug or something broken",
+      "update": "Shares news, progress or information",
+      "social": "Chat, thanks, jokes or greetings",
       "other": "Anything else"
     }
   }

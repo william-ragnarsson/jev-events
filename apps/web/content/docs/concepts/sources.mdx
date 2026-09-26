@@ -1,6 +1,6 @@
 ---
 title: Sources
-description: Where items come from. Use a connector, wrap any async iterable, accept webhooks or write your own in 30 lines.
+description: Where items come from. Use an integration, wrap any async iterable, accept webhooks or write your own in 30 lines.
 icon: Radio
 ---
 
@@ -18,12 +18,15 @@ interface Item {
 }
 ```
 
-Connectors add typed fields on top. A Twitch chat item also has `channel`, `firstMessage`, `reply` and `bits`, and your handlers see them with full types.
+Integrations add typed fields on top. An email also has `subject`, `from` and `labels`, a Twitch chat message has `channel`, `firstMessage` and `bits`, and your handlers see them with full types.
 
 ## Built-in sources
 
 | Source | Package | Notes |
 | --- | --- | --- |
+| `google.gmail.inbox({ auth })` | `@jev-events/google` | New mail in the inbox. [Guide](/docs/integrations/google) |
+| `google.calendar.events({ auth })` | `@jev-events/google` | New invitations, new events and changes to them. [Guide](/docs/integrations/google) |
+| `slack.messages({ auth })` | `@jev-events/slack` | Messages in the channels and DMs your app is in. [Guide](/docs/integrations/slack) |
 | `twitch.chat(channel, { auth? })` | `@jev-events/twitch` | Read-only without `auth`; can moderate with it. [Guide](/docs/integrations/twitch) |
 | `from(iterable, options?)` | `jev-events` | Any iterable or async iterable of strings or objects |
 | `webhook(options?)` | `jev-events` | Items arrive as HTTP POSTs |
@@ -83,6 +86,6 @@ A source is a plain object with an `id`, a `platform` and a `start(ctx)` that em
     canAct: { type: 'boolean', description: 'Whether native actions can run for real. Dry-run works either way.' },
     defaults: { type: '{ maxLagMs?: number; recent?: number }', description: 'Sensible defaults for this kind of stream. The listener\'s options win.' },
     describe: { type: '(item) => JsonValue', description: 'The lean view of an item that Jev sees. Defaults to its text, author, roles and facts.' },
-    isProtected: { type: '(item) => boolean', description: 'Items from privileged users, such as moderators. Native actions never run on them.' },
+    isProtected: { type: '(item) => boolean | string', description: 'Items from protected people, such as moderators. Native actions never run on them. Return a string, such as "colleague at acme.com", to say why.' },
   }}
 />

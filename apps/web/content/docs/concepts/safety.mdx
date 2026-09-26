@@ -1,10 +1,10 @@
 ---
 title: Safety and limits
-description: Dry-run, protected users, review bands, budgets, rate limits, stale items and the audit log.
+description: Dry-run, protected users, trash instead of delete, review bands, budgets, rate limits, stale items and the audit log.
 icon: ShieldCheck
 ---
 
-Automated moderation fails in public. The defaults assume you would rather miss a message than time out a regular.
+Automated actions fail in public. The defaults assume you would rather miss an item than time out a regular or trash a colleague's email.
 
 <Snippet name="safety" title="safe-defaults.ts" />
 
@@ -22,7 +22,7 @@ Arming a listener whose source can't act, such as an anonymous Twitch chat, fail
 
 ## Protected users
 
-Native actions never run on items from privileged users. For Twitch that's the broadcaster, moderators, VIPs and Twitch staff. Add your own rules with `protect`, for example regulars or partner bots:
+Native actions never run on items from protected people. For Twitch that's the broadcaster, moderators, VIPs and Twitch staff. For Gmail and Google Calendar it's people at your company and people you've emailed; see [Google](/docs/integrations/google#good-to-know). Add your own rules with `protect`, for example regulars or partner bots:
 
 ```ts
 listen(source, questions, {
@@ -30,7 +30,11 @@ listen(source, questions, {
 });
 ```
 
-If `protect` throws, the item is treated as protected. The action is reported as `skipped` with the reason `protected user`.
+Return a string instead of `true` to say why, such as `"regular"`. The action is reported as `skipped` with that reason, or `protected user`. If `protect` throws, the item is treated as protected.
+
+## Trash, never delete
+
+Native actions never permanently delete your own content. Gmail's `trash()` moves mail to Trash, where it can be restored for 30 days, and the Google sign-in can't delete mail at all. Nothing is sent for you either: `draftReply()` leaves a draft. Moderation actions on other people's chat messages, such as Twitch's `deleteMessage`, still remove them.
 
 ## Review bands
 

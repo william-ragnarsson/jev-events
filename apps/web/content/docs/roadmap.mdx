@@ -4,25 +4,31 @@ description: What works today, what's being built, and in which order.
 icon: Map
 ---
 
-Jev Events is young. The core API is settling, but expect small breaking changes until 1.0; each one is listed in the changelog.
+Jev Events is young, and the core API will change before 1.0. Each change is listed in the changelog.
 
 ## Available
 
 - **Core**: `listen()`, typed events, policies and review bands, dry-run, protected users, budgets, rate limits, stale dropping, the text cache, `burst()`, `logTo()` and `mockJev()`.
 - **Sources**: `from()`, `webhook()`, and the read-only public Twitch chat and Bluesky firehose.
+- **Gmail and Google Calendar**: new mail with trash, archive, label, star, mark read and draft reply; new and changed events with accept, decline and maybe. Protected by default, and nothing is ever deleted or sent. Checked by polling, with your own Google Cloud project, so your mail never passes through anyone else's servers.
+- **Slack**: messages in the channels and DMs your app is in, over Socket Mode or the Events API, with reply, react and post.
 - **Twitch**: anonymous and signed-in chat, `timeout`, `ban`, `deleteMessage`, `warn`, `reply`, `say` and `clip`, and device-code sign-in.
-- **CLI**: `watch` and `auth twitch`.
+- **CLI**: `watch` for every source, and `auth google`, `auth slack` and `auth twitch`.
 - **Benchmarks**: a labeled chat dataset and an open runner.
 
 ## In development
 
 In this order:
 
-1. **Discord**: messages from your server through the Gateway, with `deleteMessage`, `timeout`, `ban`, `kick`, `react`, `reply` and forwarding to a mod-log channel.
-2. **YouTube**: live chat, and comments under your videos. Live chat actions are delete, ban and reply; comment actions are hold for review, reject, publish, delete and reply. A quota manager keeps you inside YouTube's daily API quota and saves room for actions.
-3. **Gmail and Google Calendar**: new mail with label, archive, star, mark-read and trash; new invitations and upcoming events with accept, decline and maybe. You'll bring your own Google Cloud project, so your mail never passes through anyone else's app.
+1. **Monitors per connection**: `monitor()` replaces `listen()`. You write a monitor once, and it runs for every user who connects an account. It runs inside your web app as a webhook route and a cron route, or as a long-running worker, and keeps tokens and sync state in your Postgres database.
+2. **Push for Gmail and Google Calendar**: Google tells your app about new mail and events instead of being checked every few seconds. Push needs a public URL, so it comes with monitors.
+3. **Outlook mail and calendar**, through Microsoft Graph, with the same actions.
 
-Each connector ships with its own guide and example project.
+Each integration ships with its own guide.
+
+## Planned
+
+Discord, YouTube, Linear, Google Drive, Microsoft Teams and GitHub. Demand sets the order, so tell us which one you need.
 
 ## Suggest one
 

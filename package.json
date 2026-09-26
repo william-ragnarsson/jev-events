@@ -11,10 +11,12 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc -b packages/core packages/twitch",
+    "build": "tsc -b packages/core packages/twitch packages/google packages/slack",
     "typecheck": "tsc -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:smoke": "vitest run --config vitest.smoke.config.ts",
+    "cli": "node --conditions=source --import tsx packages/core/src/cli/main.ts",
     "changeset": "changeset",
     "version-packages": "changeset version && npm install --package-lock-only",
     "release": "npm run build && changeset publish",

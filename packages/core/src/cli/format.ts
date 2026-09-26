@@ -113,3 +113,8 @@ export function formatSummary(stats: ListenerStats): string {
 }
 
 export { paint };
+
+/** Messages say "npx jev-events …"; inside this repo the same command is "npm run cli -- …". */
+export function forThisShell(message: string): string {
+  return process.env.npm_lifecycle_event === "cli" ? message.replaceAll("npx jev-events ", "npm run cli -- ") : message;
+}

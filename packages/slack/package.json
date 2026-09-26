@@ -1,0 +1,45 @@
+{
+  "name": "@jev-events/slack",
+  "version": "0.1.0",
+  "description": "Slack for Jev Events: messages in real time through Socket Mode or the Events API, plus thread replies, reactions and posts.",
+  "type": "module",
+  "license": "MIT",
+  "author": "William Ragnarsson",
+  "homepage": "https://jevevents.dev/docs/integrations/slack",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/william-popmie/jev-events.git",
+    "directory": "packages/slack"
+  },
+  "bugs": {
+    "url": "https://github.com/william-popmie/jev-events/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "keywords": [
+    "jev",
+    "jev-events",
+    "slack",
+    "chat",
+    "socket-mode",
+    "monitoring"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "jev-events": "^0.1.0"
+  }
+}

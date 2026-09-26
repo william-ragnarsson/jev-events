@@ -1,14 +1,13 @@
 ---
 title: CLI
-description: Watch Jev label a live stream in your terminal, and sign in bot accounts.
+description: Watch Jev judge your inbox, calendar, Slack or any live stream in your terminal, and connect accounts.
 icon: SquareTerminal
 ---
 
-The `jev-events` command ships with the library, so `npx` runs it without installing anything. It needs `TYPESAFE_API_KEY` in your environment.
+The `jev-events` command ships with the library, so `npx` runs it without installing anything. It needs your TypeSafe API key: put `TYPESAFE_API_KEY=<your key>` in a `.env` file, or paste the key when it asks and it's saved there for you.
 
 ```bash
-export TYPESAFE_API_KEY=...
-npx jev-events watch twitch:<channel>
+npx jev-events watch bluesky
 ```
 
 ## `watch`
@@ -23,6 +22,9 @@ Prints one row per item with each answer, its probability and how long Jev took,
 
 | Source | What it reads |
 | --- | --- |
+| `gmail` | New mail in your inbox, after `auth google` |
+| `calendar` or `calendar:<calendar id>` | New and changed events in your Google Calendar, after `auth google` |
+| `slack` or `slack:<channel>,<channel>` | Messages in the channels and DMs your Slack app is in, after `auth slack` |
 | `twitch:<channel>` | Any public Twitch chat, no login needed |
 | `bluesky` or `bluesky:<word>,<word>` | The Bluesky firehose, optionally only posts with these words |
 | `stdin` | One item per line, e.g. `tail -f app.log \| npx jev-events watch stdin -a "..."` |
@@ -30,13 +32,13 @@ Prints one row per item with each answer, its probability and how long Jev took,
 
 ### Questions
 
-Twitch chat and Bluesky posts get a sensible default; other sources need at least one question.
+Every source gets sensible default questions, except `stdin` and `webhook`, which need at least one.
 
 | Flag | |
 | --- | --- |
 | `-a, --ask "label=Question?"` | A yes/no question. The label is optional. Repeat for more. |
 | `-c, --choice "Question?" -o a,b,c` | Pick one of these labels |
-| `-r, --recipe chat.hateful` | A built-in [recipe](/docs/recipes). Repeatable. |
+| `-r, --recipe email.urgent` | A built-in [recipe](/docs/recipes). Repeatable. |
 
 ### Options
 
@@ -54,7 +56,16 @@ Twitch chat and Bluesky posts get a sensible default; other sources need at leas
 ### Examples
 
 ```bash
-# What is chat doing, and is any of it hateful? (the default questions)
+# Does any of your mail need a reply, or is it urgent? (the default questions)
+npx jev-events watch gmail
+
+# Only the events that matter or need preparation
+npx jev-events watch calendar --only
+
+# One Slack channel
+npx jev-events watch slack:support
+
+# What is chat doing, and is any of it hateful?
 npx jev-events watch twitch:<channel>
 
 # Your own question, only showing hits
@@ -77,7 +88,16 @@ npx jev-events watch bluesky:typescript --lang en --json \
 ## `auth`
 
 ```bash
-npx jev-events auth twitch --client-id <id> [--scopes "<scope> <scope>"]
+npx jev-events auth google
+npx jev-events auth slack
+npx jev-events auth twitch --client-id <id>
 ```
 
-Signs a bot account in with Twitch's device code flow and saves the tokens to `.jev-events/credentials.json`. See [signing in a bot](/docs/integrations/twitch#sign-in-a-bot).
+Connects an account once and saves it to `.jev-events/credentials.json`, which git ignores. The first time, `auth google` and `auth slack` walk you through creating your own Google OAuth client or Slack app, one step at a time. See [Google](/docs/integrations/google#sign-in), [Slack](/docs/integrations/slack#connect-a-workspace) and [Twitch](/docs/integrations/twitch#sign-in-a-bot).
+
+| Flag | |
+| --- | --- |
+| `--client-id <id> --client-secret <secret>` | Google: use this OAuth client instead of asking |
+| `--token <xoxb-…> --app-token <xapp-…>` | Slack: use these tokens instead of asking |
+| `--client-id <id>` | Twitch: your Twitch app, required |
+| `--scopes "<scope> <scope>"` | Google and Twitch: ask for fewer permissions |

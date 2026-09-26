@@ -71,6 +71,10 @@ export const email = {
 
 /** Calendar events. Compute times in code and pass them as facts; don't ask Jev to do date math. */
 export const calendar = {
+  important: noul("Is this event important to the attendee?", {
+    true: "Missing it would have real consequences: a decision, deadline, interview, client, doctor or someone relying on them",
+    false: "Routine, optional or large broadcast events, and events they could skip or catch up on later",
+  }),
   needsPrep: noul(
     "Would the attendee need to prepare before this event, for example by reading material, building slides or making a decision?",
   ),
@@ -85,4 +89,21 @@ export const calendar = {
   }),
 } as const;
 
-export const recipes = { chat, comments, email, calendar } as const;
+/** Team chat: Slack channels and DMs. */
+export const team = {
+  needsAnswer: noul("Is someone waiting for an answer to this message?", {
+    true: "It asks a question, asks for a decision or asks someone to do something",
+    false: "Updates, chatter, thanks and messages that are just for information",
+  }),
+  urgent: noul("Is this message about something urgent, such as an outage, a blocker or a deadline today?"),
+  kind: choice("What is this message mainly doing?", {
+    question: "Asks a question",
+    request: "Asks someone to do something",
+    incident: "Reports an outage, a bug or something broken",
+    update: "Shares news, progress or information",
+    social: "Chat, thanks, jokes or greetings",
+    other: "Anything else",
+  }),
+} as const;
+
+export const recipes = { chat, comments, email, calendar, team } as const;

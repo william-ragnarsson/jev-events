@@ -4,7 +4,7 @@ description: Jev Events turns live chat, comments, inboxes and any other stream 
 icon: BookOpen
 ---
 
-Jev Events is an open-source TypeScript library. It connects to a stream, asks [TypeSafe's Jev](https://docs.typesafe.ai) a question about every item as it arrives, and turns the answers into typed events. You handle each event with a built-in platform action, such as timing out a Twitch chatter, or with your own code.
+Jev Events is an open-source TypeScript library. It connects to a stream, asks [TypeSafe's Jev](https://docs.typesafe.ai) a question about every item as it arrives, and turns the answers into typed events. You handle each event with a built-in platform action, such as archiving an email or declining an invite, or with your own code.
 
 <Snippet name="hero" title="moderator.ts" />
 
@@ -19,7 +19,7 @@ The call itself is the easy part. Around it you need sockets and sign-in, reconn
 <Steps>
 <Step>
 
-**Pick a source.** `twitch.chat("mychannel")`, a webhook, or any async iterable. Every item arrives as the same small `Item` shape.
+**Pick a source.** `google.gmail.inbox({ auth })`, `slack.messages({ auth })`, `twitch.chat("mychannel")`, a webhook, or any async iterable. Every item arrives as the same small `Item` shape.
 
 </Step>
 <Step>
@@ -34,7 +34,7 @@ The call itself is the easy part. Around it you need sockets and sign-in, reconn
 </Step>
 <Step>
 
-**Act.** Built-in actions stay in dry-run until you arm them and never touch moderators. Your own functions run as soon as an outcome fires.
+**Act.** Built-in actions stay in dry-run until you arm them, and skip protected people such as colleagues and moderators. Your own functions run as soon as an outcome fires.
 
 </Step>
 </Steps>
@@ -43,12 +43,14 @@ The call itself is the easy part. Around it you need sockets and sign-in, reconn
 
 | | Status |
 | --- | --- |
+| Gmail and Google Calendar: judge new mail and events, and act on them | Available |
+| Slack: the channels and direct messages your app is in | Available |
 | Twitch chat: read any channel, moderate your own | Available |
 | Any async iterable, webhooks, the Bluesky firehose | Available |
-| CLI: `npx jev-events watch` | Available |
-| YouTube live chat and comments | In development |
-| Discord | In development |
-| Gmail and Google Calendar | In development |
+| CLI: `npx jev-events watch` and `auth` | Available |
+| Monitors that run for every user who connects an account | In development |
+| Outlook mail and calendar | In development |
+| Discord, YouTube and more | Planned |
 
 See the [roadmap](/docs/roadmap) for what's next.
 
@@ -59,6 +61,8 @@ In your own process, with your own credentials. Jev Events has no servers: items
 <Cards>
   <Card title="Quickstart" href="/docs/quickstart" description="Label a live Twitch chat in five minutes." />
   <Card title="Questions" href="/docs/concepts/questions" description="choice, noul and score, and the events they create." />
+  <Card title="Gmail and Google Calendar" href="/docs/integrations/google" description="Flag the mail and meetings that matter, and act on the rest." />
+  <Card title="Slack" href="/docs/integrations/slack" description="Spot urgent messages and questions, then react, reply or post." />
   <Card title="Twitch" href="/docs/integrations/twitch" description="Sign a bot in and moderate your channel." />
   <Card title="Recipes" href="/docs/recipes" description="Ready-made questions for chat, comments, email and calendars." />
 </Cards>

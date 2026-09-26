@@ -4,25 +4,29 @@ import { parseArgs } from "node:util";
 
 import { TypeSafeError } from "@typesafe-ai/sdk";
 
-import { paint } from "./format.js";
+import { KEY_URL, loadEnv, readSecret } from "./env.js";
+import { forThisShell, paint } from "./format.js";
 import { UsageError, watch, type WatchFlags } from "./watch.js";
 
-const HELP = `${paint(["bold", "magenta"], "jev-events")}: turn any stream into typed, semantic events, judged by TypeSafe's Jev
+const HELP = `${paint(["bold", "magenta"], "jev-events")}: watch a stream, ask Jev about every item, see the answers live
 
 ${paint("bold", "Usage")}
   jev-events watch <source> [questions] [options]
-  jev-events auth twitch [--client-id <id>]
+  jev-events auth <google|slack|twitch>      connect an account once; saved in .jev-events/
 
 ${paint("bold", "Sources")}
+  gmail                    new mail in your inbox (after: jev-events auth google)
+  calendar                 new and changed events in your Google Calendar (after: jev-events auth google)
+  slack[:channel]          messages in channels the Slack app is in (after: jev-events auth slack)
   twitch:<channel>         any public Twitch chat, no login needed
   bluesky[:word,word]      the Bluesky firehose, optionally only posts with these words
   stdin                    one item per line: tail -f app.log | jev-events watch stdin -a "..."
   webhook[:port]           POST {"text": "..."} to http://127.0.0.1:8787/
 
-${paint("bold", "Questions")} (chat and posts get a sensible default)
+${paint("bold", "Questions")} (every source above except stdin and webhook has sensible defaults)
   -a, --ask "label=Question?"          a yes/no question; repeatable
   -c, --choice "Question?" -o a,b,c    pick one of these labels
-  -r, --recipe chat.hateful            a built-in question; repeatable
+  -r, --recipe email.urgent            a built-in question; repeatable
 
 ${paint("bold", "Options")}
   -f, --filter <regex>   only judge items that match
@@ -36,10 +40,12 @@ ${paint("bold", "Options")}
   -h, --help
   -v, --version
 
-Set TYPESAFE_API_KEY first. Docs: https://jevevents.dev
+Needs a TypeSafe API key: put TYPESAFE_API_KEY=<key> in a .env file, or paste it when asked.
+Docs: https://jevevents.dev
 `;
 
 async function main(argv: string[]): Promise<void> {
+  loadEnv();
   const { values, positionals } = parseArgs({
     args: argv,
     allowPositionals: true,
@@ -57,7 +63,10 @@ async function main(argv: string[]): Promise<void> {
       model: { type: "string", short: "m" },
       json: { type: "boolean" },
       "client-id": { type: "string" },
+      "client-secret": { type: "string" },
       scopes: { type: "string" },
+      token: { type: "string" },
+      "app-token": { type: "string" },
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
     },
@@ -85,30 +94,34 @@ async function main(argv: string[]): Promise<void> {
 }
 
 async function auth(platform: string | undefined, values: Record<string, unknown>): Promise<void> {
-  const packages: Record<string, string> = { twitch: "@jev-events/twitch", google: "@jev-events/google", discord: "@jev-events/discord" };
+  const packages: Record<string, string> = { google: "@jev-events/google", slack: "@jev-events/slack", twitch: "@jev-events/twitch" };
   const name = packages[platform ?? ""];
   if (!name) throw new UsageError(`Usage: jev-events auth <${Object.keys(packages).join("|")}>`);
-  let mod: { authorize?: (options: Record<string, unknown>) => Promise<void> };
+  let mod: { authorize?: (options: Record<string, unknown>) => Promise<unknown> };
   try {
     mod = (await import(name)) as typeof mod;
-  } catch {
+  } catch (error) {
+    const missing = (error as NodeJS.ErrnoException).code === "ERR_MODULE_NOT_FOUND" && String(error).includes(name);
+    if (!missing) throw error;
     throw new UsageError(`Install ${name} first: npm i ${name}`);
   }
   if (!mod.authorize) throw new UsageError(`${name} doesn't support "jev-events auth" yet.`);
-  await mod.authorize(values);
+  await mod.authorize({
+    ...values,
+    print: (line: string) => process.stdout.write(`${forThisShell(line)}\n`),
+    ...(process.stdin.isTTY ? { askSecret: (question: string) => readSecret(question) } : {}),
+  });
 }
 
 main(process.argv.slice(2)).catch((error: unknown) => {
   if (error instanceof UsageError) {
-    process.stderr.write(`${paint("red", "✖")} ${error.message}\n`);
+    process.stderr.write(`${paint("red", "✖")} ${forThisShell(error.message)}\n`);
     process.exit(2);
   }
   if (error instanceof TypeSafeError && /api key/i.test(error.message)) {
-    process.stderr.write(
-      `${paint("red", "✖")} Set TYPESAFE_API_KEY to your TypeSafe API key. Get one: https://docs.typesafe.ai/introduction/quickstart\n`,
-    );
+    process.stderr.write(`${paint("red", "✖")} No TypeSafe API key found. Put TYPESAFE_API_KEY=<your key> in .env. Get one: ${KEY_URL}\n`);
     process.exit(2);
   }
-  process.stderr.write(`${paint("red", "✖")} ${error instanceof Error ? error.message : String(error)}\n`);
+  process.stderr.write(`${paint("red", "✖")} ${forThisShell(error instanceof Error ? error.message : String(error))}\n`);
   process.exit(1);
 });

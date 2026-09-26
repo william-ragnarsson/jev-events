@@ -69,8 +69,11 @@ export interface Source<I extends Item = Item, P extends string = string> {
   start(ctx: SourceContext<I>): Promise<void> | void;
   /** The lean JSON view of an item that Jev sees. Defaults to text, author and facts. */
   describe?(item: I): JsonValue;
-  /** Items from privileged users (broadcaster, moderators...). Native actions never run on them. */
-  isProtected?(item: I): boolean;
+  /**
+   * Items from privileged users (broadcaster, moderators...). Native actions never run on them.
+   * Return a reason, such as "colleague at acme.com", to say why when an action is skipped.
+   */
+  isProtected?(item: I): boolean | string;
 }
 
 export type AnySource = Source<any, string>;
@@ -147,6 +150,8 @@ export interface JudgedEvent<I extends Item = Item, Q extends Questions = Questi
   readonly dryRun: boolean;
   /** True when the item comes from a privileged user; native actions skip it. */
   readonly protected: boolean;
+  /** Why the item is protected, e.g. "colleague at acme.com". */
+  readonly protectedBecause?: string;
 }
 
 export interface Trigger {
@@ -196,6 +201,8 @@ export interface ErrorEvent<I extends Item = Item> {
   readonly error: unknown;
   readonly phase: ErrorPhase;
   readonly item?: I;
+  /** The source can't go on, such as when its sign-in was revoked, so the listener stops. */
+  readonly fatal?: boolean;
 }
 
 // ---------------------------------------------------------------------------

@@ -45,8 +45,8 @@ export interface ListenOptions<I extends Item = Item> {
   dryRun?: boolean;
   /** Return false to skip an item before it is judged (and before it costs anything). */
   filter?: (item: I) => boolean;
-  /** Extra protection on top of the source's own (for example an allowlist). */
-  protect?: (item: I) => boolean;
+  /** Extra protection on top of the source's own (for example an allowlist). Return a string to give the reason. */
+  protect?: (item: I) => boolean | string;
   context?: {
     /** How many preceding items to show Jev. Defaults to the source's suggestion. */
     recent?: number;
@@ -408,7 +408,7 @@ class JevListener<S extends AnySource, Q extends Questions> implements Listener<
 
   #sourceFailed(error: unknown, fatal: boolean): void {
     this.#stats.errors++;
-    this.#emit("error", { error, phase: "source" });
+    this.#emit("error", { error, phase: "source", ...(fatal ? { fatal } : {}) });
     if (fatal) void this.stop();
   }
 
@@ -565,7 +565,7 @@ class JevListener<S extends AnySource, Q extends Questions> implements Listener<
         : { inputTokens: result.usage.input_tokens, outputTokens: result.usage.output_tokens },
       cached,
       dryRun: this.#dryRun,
-      protected: this.#isProtected(item),
+      ...this.#protection(item),
     };
     this.#emit("judged", event);
 
@@ -607,7 +607,7 @@ class JevListener<S extends AnySource, Q extends Questions> implements Listener<
       this.#emit("action", { action: action.name, description, status, ...(reason ? { reason } : {}), event });
     };
 
-    if (event.protected) return report("skipped", "protected user");
+    if (event.protected) return report("skipped", event.protectedBecause ?? "protected user");
     if (event.dryRun) {
       this.#log.info(`[dry-run] would ${description} (${summarize(event.trigger)})`);
       return report("dry-run");
@@ -623,13 +623,16 @@ class JevListener<S extends AnySource, Q extends Questions> implements Listener<
     }
   }
 
-  #isProtected(item: Item): boolean {
+  #protection(item: Item): { protected: boolean; protectedBecause?: string } {
+    let verdict: boolean | string | undefined;
     try {
-      return Boolean(this.source.isProtected?.(item)) || Boolean(this.#options.protect?.(item));
+      verdict = this.source.isProtected?.(item) || this.#options.protect?.(item);
     } catch {
       // When protection can't be decided, err on the side of not acting.
-      return true;
+      return { protected: true, protectedBecause: "couldn't check whether the item is protected" };
     }
+    if (typeof verdict === "string" && verdict) return { protected: true, protectedBecause: verdict };
+    return { protected: Boolean(verdict) };
   }
 
   #drop(item: Item, reason: DropReason): void {

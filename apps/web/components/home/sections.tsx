@@ -25,7 +25,7 @@ import snippets from '@/generated/snippets.json';
 import { headlineRun, percent, type BenchmarkRun } from '@/lib/benchmarks';
 import { cn } from '@/lib/cn';
 import { site } from '@/lib/site';
-import { DiscordIcon, GitHubIcon, GmailIcon, GoogleCalendarIcon, TwitchIcon, YouTubeIcon } from '../brand-icons';
+import { GitHubIcon, GmailIcon, GoogleCalendarIcon, SlackIcon, TwitchIcon, YouTubeIcon } from '../brand-icons';
 import { Code } from '../code';
 import { InstallCommand } from '../install-command';
 import { LabelChip } from '../live-feed';
@@ -151,11 +151,19 @@ export function Hero({ feed }: { feed: ReactNode }) {
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>> | LucideIcon;
 
+type IntegrationStatus = 'available' | 'in-development' | 'planned';
+
+const STATUS_LABEL: Record<IntegrationStatus, string> = {
+  available: 'Available',
+  'in-development': 'In development',
+  planned: 'Planned',
+};
+
 const INTEGRATIONS: Array<{
   name: string;
   icon: Icon;
   color?: string;
-  available: boolean;
+  status: IntegrationStatus;
   what: string;
   actions: string[];
   href?: string;
@@ -164,47 +172,50 @@ const INTEGRATIONS: Array<{
     name: 'Twitch',
     icon: TwitchIcon,
     color: '#9146FF',
-    available: true,
+    status: 'available',
     what: 'Live chat, signed in or read-only',
     actions: ['timeout', 'ban', 'delete', 'warn', 'reply', 'clip'],
     href: '/docs/integrations/twitch',
   },
   {
-    name: 'YouTube',
-    icon: YouTubeIcon,
-    color: '#FF0000',
-    available: false,
-    what: 'Live chat and video comments',
-    actions: ['delete', 'ban', 'hold for review', 'reply'],
-  },
-  {
-    name: 'Discord',
-    icon: DiscordIcon,
-    color: '#5865F2',
-    available: false,
-    what: 'Messages in your server',
-    actions: ['delete', 'timeout', 'kick', 'react', 'mod log'],
-  },
-  {
     name: 'Gmail',
     icon: GmailIcon,
     color: '#EA4335',
-    available: false,
+    status: 'available',
     what: 'New mail as it lands',
-    actions: ['label', 'archive', 'star', 'mark read'],
+    actions: ['trash', 'archive', 'label', 'star', 'mark read', 'draft reply'],
+    href: '/docs/integrations/google',
   },
   {
     name: 'Google Calendar',
     icon: GoogleCalendarIcon,
     color: '#4285F4',
-    available: false,
-    what: 'New and upcoming events',
+    status: 'available',
+    what: 'New and changed events',
     actions: ['accept', 'decline', 'maybe'],
+    href: '/docs/integrations/google',
+  },
+  {
+    name: 'Slack',
+    icon: SlackIcon,
+    color: '#E01E5A',
+    status: 'available',
+    what: 'Channels and DMs your app is in',
+    actions: ['reply', 'react', 'post'],
+    href: '/docs/integrations/slack',
+  },
+  {
+    name: 'YouTube',
+    icon: YouTubeIcon,
+    color: '#FF0000',
+    status: 'planned',
+    what: 'Live chat and video comments',
+    actions: ['delete', 'ban', 'hold for review', 'reply'],
   },
   {
     name: 'Anything else',
     icon: Webhook,
-    available: true,
+    status: 'available',
     what: 'Async iterables, webhooks, your own source',
     actions: ['your code'],
     href: '/docs/integrations/custom',
@@ -217,7 +228,7 @@ export function Integrations() {
       id="integrations"
       eyebrow="Sources"
       title="The streams people actually moderate."
-      lead="Every connector uses the platform's official API with your own credentials, in your own app. Nothing is scraped, and nothing runs on our servers."
+      lead="Every integration uses the platform's official API with your own credentials, in your own app. Nothing is scraped, and nothing runs on our servers."
     >
       <div className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border bg-fd-border sm:grid-cols-2 lg:grid-cols-3">
         {INTEGRATIONS.map((integration) => {
@@ -229,12 +240,12 @@ export function Integrations() {
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 font-mono text-[10px] font-medium tracking-wide uppercase',
-                    integration.available
+                    integration.status === 'available'
                       ? 'bg-signal-soft text-signal'
                       : 'bg-fd-secondary text-fd-muted-foreground',
                   )}
                 >
-                  {integration.available ? 'Available' : 'In development'}
+                  {STATUS_LABEL[integration.status]}
                 </span>
               </div>
               <h3 className="mt-5 font-semibold">{integration.name}</h3>
@@ -595,7 +606,7 @@ export function Recipes() {
 // Try it, and the end of the page
 // ---------------------------------------------------------------------------
 
-const CLI = `export TYPESAFE_API_KEY=...   # your TypeSafe API key
+const CLI = `# The first run asks for your TypeSafe API key and saves it to .env
 
 # Label any public Twitch chat. No Twitch login needed.
 npx jev-events watch twitch:<channel>
@@ -709,7 +720,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t">
         <p className="mx-auto w-full max-w-6xl px-4 py-5 text-xs text-fd-muted-foreground sm:px-6">
-          MIT licensed. Twitch, YouTube, Discord, Gmail and Google Calendar are trademarks of their owners.
+          MIT licensed. Twitch, YouTube, Discord, Gmail, Google Calendar and Slack are trademarks of their owners.
         </p>
       </div>
     </footer>

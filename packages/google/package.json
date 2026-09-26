@@ -1,0 +1,46 @@
+{
+  "name": "@jev-events/google",
+  "version": "0.1.0",
+  "description": "Gmail and Google Calendar for Jev Events: new mail and calendar events as they arrive, plus trash, archive, labels, draft replies and invite responses.",
+  "type": "module",
+  "license": "MIT",
+  "author": "William Ragnarsson",
+  "homepage": "https://jevevents.dev/docs/integrations/google",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/william-popmie/jev-events.git",
+    "directory": "packages/google"
+  },
+  "bugs": {
+    "url": "https://github.com/william-popmie/jev-events/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "keywords": [
+    "jev",
+    "jev-events",
+    "gmail",
+    "google-calendar",
+    "email",
+    "calendar",
+    "monitoring"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "jev-events": "^0.1.0"
+  }
+}

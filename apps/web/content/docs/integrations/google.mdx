@@ -1,0 +1,115 @@
+---
+title: Gmail and Google Calendar
+description: Judge new mail and calendar events as they arrive, and act on them in the account.
+icon: Mail
+---
+
+```bash
+npm i jev-events @jev-events/google
+```
+
+One package covers both, with one sign-in.
+
+| | Gmail | Google Calendar |
+| --- | --- | --- |
+| Source | `google.gmail.inbox({ auth })` | `google.calendar.events({ auth })` |
+| Emits | New mail in the inbox | New invitations, new events and changes to them |
+| Checks every | 15 seconds | 30 seconds |
+| Native actions | `trash`, `archive`, `label`, `star`, `markRead`, `draftReply` | `accept`, `decline`, `maybe` |
+
+<Snippet name="google" title="assistant.ts" />
+
+## Sign in
+
+<Steps>
+<Step>
+
+**Run the sign-in.**
+
+```bash
+npx jev-events auth google
+```
+
+The first time, it lists four steps to create your own Google OAuth client, with a link for each: a Cloud project, the Gmail and Calendar APIs, the consent screen, and a client of type **Desktop app**. Download the client's JSON and press Enter. It finds the file in your Downloads folder.
+
+</Step>
+<Step>
+
+**Allow access in the browser.** Google says it hasn't verified the app. It's your own app, so click Continue and tick every box. The tokens are saved to `.jev-events/credentials.json`, which only your user can read, and refreshed tokens are written back automatically.
+
+</Step>
+<Step>
+
+**Pass the sign-in to the source.**
+
+```ts
+const auth = google.auth.fromFile();
+google.gmail.inbox({ auth });
+```
+
+</Step>
+</Steps>
+
+On a server, use `google.auth.fromEnv()`, which reads `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REFRESH_TOKEN`. If you store tokens yourself, `google.auth.withTokens(tokens, onRefresh)` hands you refreshed tokens to save.
+
+<Callout title="Testing mode signs you out after 7 days">
+  While your consent screen is in Testing, Google expires the sign-in after a week. Run `auth google` again, or publish the app under Audience. To let your own users connect Gmail, Google must first verify your app, and Gmail access also needs a yearly security assessment.
+</Callout>
+
+## Actions
+
+| Action | What it does |
+| --- | --- |
+| `google.gmail.trash()` | Moves the email to Trash, where Gmail keeps it for 30 days. |
+| `google.gmail.archive()` | Takes it out of the inbox. It stays in All Mail. |
+| `google.gmail.label(name)` | Adds a label, creating it the first time. |
+| `google.gmail.star()` | Stars it. |
+| `google.gmail.markRead()` | Marks it as read. |
+| `google.gmail.draftReply(text)` | Saves a reply as a draft in the thread. It is never sent. |
+| `google.calendar.accept({ comment? })` | Says yes to the invite. The organizer is told. |
+| `google.calendar.decline({ comment? })` | Says no. The event stays on the calendar, marked declined. |
+| `google.calendar.maybe({ comment? })` | Answers maybe. |
+
+`text` can be a string or a function of the event. An answer to a recurring invite covers the whole series.
+
+## Emails
+
+Handlers receive a `GmailItem`:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `subject` | `string` | |
+| `body` | `string` | The new text, with quoted replies cut |
+| `from`, `to`, `cc` | `{ name?, address }` | |
+| `labels` | `string[]` | Gmail label IDs, such as `INBOX` or `IMPORTANT` |
+| `category` | `string` | Gmail's inbox tab: `personal`, `social`, `promotions`, `updates` or `forums` |
+| `mailingList` | `boolean` | Sent through a list or bulk sender |
+| `attachments` | `{ filename, mimeType, size }[]` | |
+| `protectedBecause` | `string` | Why native actions skip it, if they do |
+
+Jev sees who wrote it, the subject and the new text, plus facts worked out from the account: whether it was sent to you directly, whether it's a reply, whether the sender is a colleague or someone you've emailed before, and its attachments.
+
+## Events
+
+Handlers receive a `CalendarItem`:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `title`, `description` | `string` | The description as plain text |
+| `start`, `end` | `Date` | For a recurring event, the next occurrence |
+| `organizer` | `{ email, name?, you }` | |
+| `attendees` | `{ email, name?, response, optional }[]` | Rooms are left out |
+| `yourResponse` | `string` | `accepted`, `declined`, `maybe` or `pending` |
+| `meetingLink` | `string` | Meet, Zoom, Teams or another video link |
+| `change` | `string` | `new`, `updated`, or `existing` for backfilled events |
+| `protectedBecause` | `string` | Why native actions skip it, if they do |
+
+Jev sees the title, when it starts and the description, plus facts: how soon it starts, how long it lasts, who organized it and whether they're a colleague, how many people are invited, and your answer so far. Times are worked out in code, so Jev never does date math.
+
+## Good to know
+
+- **Protected by default.** Native actions skip mail and invites from people at your company, and from people you've emailed before. Your company is your address's domain, and public ones such as gmail.com never count. Change it with `protect: { addresses, except }`, or turn it off with `protect: false`. A skipped action reports why, for example `colleague at acme.com`.
+- **Nothing is deleted.** The sign-in can't delete mail permanently, and the package never tries. `trash()` is the only removal, and Trash can be undone for 30 days.
+- **Nothing is sent.** `draftReply()` leaves a draft for the person to read and send.
+- **Polling.** Pass `every: "1m"` to check less often. Push through Google's notifications is on the [roadmap](/docs/roadmap).
+- **Backfill.** `backfill: 5` also emits the 5 latest emails, or the next 5 events, when it starts. `npx jev-events watch gmail` does this.

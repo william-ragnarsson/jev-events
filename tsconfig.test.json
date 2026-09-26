@@ -15,7 +15,8 @@
     "apps/live-relay/test/**/*.ts",
     "scripts/**/*.ts",
     "apps/web/test/**/*.ts",
-    "apps/web/snippets/**/*.ts"
+    "apps/web/snippets/**/*.ts",
+    "smoke/**/*.ts"
   ],
   "exclude": [
     "**/node_modules/**",

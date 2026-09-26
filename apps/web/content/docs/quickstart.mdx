@@ -5,7 +5,7 @@ icon: Rocket
 ---
 
 <Callout title="No code first?">
-  `npx jev-events watch twitch:<channel>` labels any public chat in your terminal. See the [CLI](/docs/cli).
+  `npx jev-events watch bluesky` judges live posts in your terminal, with no account needed. `watch gmail`, `watch calendar` and `watch slack` work the same after `auth google` or `auth slack`. See the [CLI](/docs/cli).
 </Callout>
 
 <Steps>
@@ -24,10 +24,10 @@ npm i jev-events @jev-events/twitch
 
 ### Add your TypeSafe key
 
-Get an API key from [TypeSafe](https://docs.typesafe.ai/introduction/quickstart) and put it in your environment. The library reads `TYPESAFE_API_KEY`.
+Get an API key from [TypeSafe](https://docs.typesafe.ai/introduction/quickstart) and put this line in a file called `.env` next to your code:
 
-```bash
-export TYPESAFE_API_KEY=...
+```txt
+TYPESAFE_API_KEY=<your key>
 ```
 
 </Step>
@@ -45,7 +45,7 @@ Reading a public Twitch chat needs no Twitch account. Pick any channel that is l
 ### Run it
 
 ```bash
-npx tsx listener.ts
+npx tsx --env-file=.env listener.ts
 ```
 
 Questions for the streamer are printed as they arrive. The timeout never happens: native actions start in dry-run, so you'll only see a line like this.

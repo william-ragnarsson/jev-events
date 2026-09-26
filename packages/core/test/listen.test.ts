@@ -169,6 +169,28 @@ describe("native actions", () => {
     expect(chat.stats().actions).toMatchObject({ done: 1, skipped: 1 });
   });
 
+  it("says why an item is protected when the source gives a reason", async () => {
+    const act = defineAction({ platform: "test", name: "test.trash", describe: () => "trash", run: async () => {} });
+    const source = manualSource({ isProtected: (item) => (item.author?.name.endsWith("@acme.com") ? "colleague at acme.com" : false) });
+    const actions: ActionEvent[] = [];
+    const judged: boolean[] = [];
+    const mail = listen(source, { hateful }, { client: mockJev(() => ({ hateful: 0.99 })), dryRun: false, log: silentLogger })
+      .on("hateful", act)
+      .on("judged", (e) => {
+        judged.push(e.protected);
+      })
+      .on("action", (e) => {
+        actions.push(e);
+      });
+    await mail.start();
+    source.push("spam", { author: { id: "1", name: "ann@acme.com" } });
+    await mail.idle();
+    await mail.stop();
+
+    expect(judged).toEqual([true]);
+    expect(actions.map((e) => [e.status, e.reason, e.event.protectedBecause])).toEqual([["skipped", "colleague at acme.com", "colleague at acme.com"]]);
+  });
+
   it("refuses to arm actions on a source that can't act", async () => {
     const chat = listen(manualSource({ canAct: false }), { hateful }, { client: mockJev(() => ({})), dryRun: false }).on(
       "hateful",
