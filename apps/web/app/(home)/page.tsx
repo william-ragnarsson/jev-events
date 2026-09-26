@@ -1,34 +1,20 @@
-import {
-  Benchmarks,
-  CodeShowcase,
-  FinalCta,
-  Hero,
-  HowItWorks,
-  Integrations,
-  Recipes,
-  RelaySource,
-  Safety,
-  TryIt,
-} from '@/components/home/sections';
-import { LiveFeed } from '@/components/live-feed';
-import { LiveStats } from '@/components/live-stats';
-import { RelayProvider } from '@/components/relay/relay-provider';
+import type { Metadata } from 'next';
+
+import { Landing } from '@/components/landing/landing';
 import { site } from '@/lib/site';
 
+const title = 'Jev Events: Ask every event a question';
+const description =
+  "A TypeScript library that asks TypeSafe's Jev a question about every new email, invite or message your users get, and runs your code or a native action on the answer.";
+
+export const metadata: Metadata = {
+  title: { absolute: title },
+  description,
+  openGraph: { type: 'website', siteName: site.name, url: site.url, title, description },
+  twitter: { card: 'summary_large_image', title, description },
+};
+
+// The landing page brings its own nav and footer, so this route group has no layout.
 export default function HomePage() {
-  return (
-    <RelayProvider url={site.relayUrl}>
-      <Hero feed={<LiveFeed />} />
-      <LiveStats />
-      <HowItWorks />
-      <Integrations />
-      <CodeShowcase />
-      <Safety />
-      <RelaySource />
-      <Benchmarks />
-      <Recipes />
-      <TryIt />
-      <FinalCta />
-    </RelayProvider>
-  );
+  return <Landing />;
 }

@@ -1,0 +1,300 @@
+/* The landing page's own theme. It's scoped to .landing so the docs keep the Fumadocs theme. */
+
+.landing {
+  --bg: #07080a;
+  --panel: #0c0e11;
+  --panel-2: #111318;
+  --line: rgb(255 255 255 / 0.07);
+  --line-2: rgb(255 255 255 / 0.13);
+  --fg: #eceef1;
+  --muted: #8a9099;
+  --dim: #6c727c;
+  --tok-kw: #b7a6ff;
+  --tok-str: #e7c889;
+  --tok-com: #5f6570;
+  --tok-fn: #7fcfff;
+  --tok-num: #f3a98a;
+  --tok-key: #e6e8eb;
+  --tok-punc: #7d838c;
+  --tok-id: #c5cad2;
+  --tok-ln: #353a42;
+  /* The exact blue isn't settled yet; change it here. --accent-ink is the text color on top of it. */
+  --accent: #8ab8ff;
+  --accent-ink: #04111f;
+  /* Jev's verdicts in the hero console: --match when a monitor's question comes back yes and it
+     acts, --no-match when it doesn't, and --review for borderline answers a person decides. Swap
+     the first two to flip red and green. */
+  --match: #f87171;
+  --no-match: #4ade80;
+  --review: #fbbf24;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.landing ::selection {
+  background: color-mix(in oklab, var(--accent) 35%, transparent);
+}
+
+.landing-display {
+  font-family: var(--font-archivo), var(--font-sans);
+  font-variation-settings: 'wdth' 72;
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: -0.012em;
+}
+
+/* Hateful messages are never shown, only a striped bar where the text would be. */
+.landing-redacted {
+  display: inline-block;
+  width: 9.5rem;
+  height: 0.8em;
+  vertical-align: -0.05em;
+  border-radius: 3px;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in oklab, #ef4444 38%, transparent) 0 5px,
+    color-mix(in oklab, #ef4444 16%, transparent) 5px 10px
+  );
+}
+
+.landing-rise {
+  animation: landing-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+.landing-grow {
+  animation: landing-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: left center;
+}
+
+@keyframes landing-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.landing-spot {
+  background:
+    radial-gradient(420px circle at var(--mx, -999px) var(--my, -999px), rgb(255 255 255 / 0.055), transparent 45%),
+    var(--panel);
+}
+
+.landing-border-glow {
+  background:
+    linear-gradient(var(--panel), var(--panel)) padding-box,
+    linear-gradient(
+        135deg,
+        color-mix(in oklab, var(--accent) 70%, transparent),
+        rgb(255 255 255 / 0.08) 40%,
+        rgb(255 255 255 / 0.04) 60%,
+        color-mix(in oklab, var(--accent) 45%, transparent)
+      )
+      border-box;
+  border: 1px solid transparent;
+}
+
+.landing-live-dot {
+  animation: landing-live 1.8s ease-in-out infinite;
+}
+
+@keyframes landing-live {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+.landing-line-on {
+  background: color-mix(in oklab, var(--accent) 9%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Hero console                                                                               */
+/* ------------------------------------------------------------------------------------------ */
+
+.landing-console {
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.05) inset,
+    0 40px 100px -40px rgb(0 0 0 / 0.95);
+}
+
+.landing-lanes {
+  background-image: repeating-linear-gradient(to bottom, transparent 0 55px, var(--line) 55px 56px);
+  mask-image: linear-gradient(to right, transparent, #000 48px);
+}
+
+.landing-judged-zone {
+  background: color-mix(in oklab, var(--accent) 3.5%, transparent);
+}
+
+.landing-bit {
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(255 255 255 / 0.04);
+}
+
+.landing-item {
+  border: 1px solid var(--line-2);
+  background: rgb(255 255 255 / 0.045);
+  color: var(--fg);
+}
+
+.landing-tick {
+  background: color-mix(in oklab, var(--no-match) 38%, transparent);
+}
+
+.landing-hit {
+  border: 1px solid color-mix(in oklab, var(--match) 55%, transparent);
+  background: color-mix(in oklab, var(--match) 13%, transparent);
+  color: color-mix(in oklab, var(--match) 70%, white);
+}
+
+.landing-review {
+  border: 1px dashed color-mix(in oklab, var(--review) 55%, transparent);
+  color: color-mix(in oklab, var(--review) 75%, var(--fg));
+}
+
+/* An item as it comes out of the playhead, lit in the colour of Jev's verdict. The lit layer in
+   hero.tsx fades it out as it moves away. It has to come after the item classes it overrides. */
+.landing-lit {
+  --v: var(--no-match);
+  border: 1px solid color-mix(in oklab, var(--v) 80%, transparent);
+  background: color-mix(in oklab, var(--v) 26%, var(--panel));
+  color: color-mix(in oklab, var(--v) 35%, white);
+  box-shadow: 0 0 22px -2px color-mix(in oklab, var(--v) 60%, transparent);
+}
+
+.landing-lit.landing-hit {
+  --v: var(--match);
+}
+
+.landing-lit.landing-review {
+  --v: var(--review);
+  border-style: dashed;
+}
+
+.landing-playhead {
+  background: var(--accent);
+  box-shadow: 0 0 14px color-mix(in oklab, var(--accent) 55%, transparent);
+}
+
+.landing-flash {
+  --v: var(--no-match);
+  background: var(--v);
+  box-shadow: 0 0 14px 2px color-mix(in oklab, var(--v) 65%, transparent);
+}
+
+.landing-flash[data-verdict='match'] {
+  --v: var(--match);
+}
+
+.landing-flash[data-verdict='review'] {
+  --v: var(--review);
+}
+
+/*
+ * The hero's entrance runs in CSS rather than GSAP, so it starts with the first paint instead of
+ * flashing the finished hero until hydration. Eases: quintOut, quartOut, quartInOut, cubicOut.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .landing [data-hero-word] {
+    animation: landing-word 1.1s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--i, 0) * 70ms) both;
+  }
+
+  .landing [data-hero-fade] {
+    animation: landing-fade 0.9s cubic-bezier(0.25, 1, 0.5, 1) calc(400ms + var(--i, 0) * 100ms) both;
+  }
+
+  .landing [data-hero-console] {
+    animation: landing-console 1.3s cubic-bezier(0.25, 1, 0.5, 1) 250ms both;
+  }
+
+  .landing [data-hero-row] {
+    animation: landing-row 0.7s cubic-bezier(0.25, 1, 0.5, 1) calc(750ms + var(--i, 0) * 60ms) both;
+  }
+
+  .landing [data-hero-play] {
+    animation: landing-play 1s cubic-bezier(0.76, 0, 0.24, 1) 850ms both;
+  }
+
+  .landing [data-hero-lanes] {
+    animation: landing-lanes 1.2s cubic-bezier(0.33, 1, 0.68, 1) 1050ms both;
+  }
+}
+
+@keyframes landing-word {
+  from {
+    transform: translateY(110%);
+  }
+}
+
+@keyframes landing-fade {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes landing-console {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+}
+
+@keyframes landing-row {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+
+@keyframes landing-play {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes landing-lanes {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* Reduced motion                                                                             */
+/* ------------------------------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .landing * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  /* The pinned walkthrough becomes the stacked one. */
+  .landing [data-story-pin] {
+    display: none !important;
+  }
+
+  .landing [data-story-stack] {
+    display: block !important;
+  }
+}
