@@ -180,8 +180,7 @@ through `from(asyncIterable)` or `webhook()`. See
 | [`examples/twitch-moderator`](examples/twitch-moderator) | A complete Twitch moderator in about 50 lines |
 | [`evals`](evals) | The labeled dataset and the benchmark runner behind every published accuracy number |
 | [`apps/web`](apps/web) | [jevevents.dev](https://jevevents.dev): the landing page and the docs |
-| [`apps/live-relay`](apps/live-relay) | The service behind the live Twitch feed |
-| [`scripts`](scripts) | Site data generation and a local stand-in for Jev |
+| [`scripts`](scripts) | Site data generation |
 | [`smoke`](smoke) | Opt-in tests of each integration against the real service |
 | [`CONTEXT.md`](CONTEXT.md), [`docs/adr`](docs/adr) | The words the code and docs use, and the decisions behind the design |
 

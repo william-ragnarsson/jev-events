@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { choice, from, monitor, noul, silentLogger } from "jev-events";
 
 // Real Jev. Skipped unless TYPESAFE_API_KEY is set, and when TYPESAFE_BASE_URL points at a local
-// stand-in such as `npm run mock-jev`. Makes three requests.
+// stand-in. Makes three requests.
 
 const key = process.env.TYPESAFE_API_KEY;
 const local = /\/\/(127\.0\.0\.1|localhost)\b/.test(process.env.TYPESAFE_BASE_URL ?? "");

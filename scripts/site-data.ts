@@ -1,7 +1,6 @@
 /**
  * Data the website shows, taken from the code itself so the two never drift:
  *   apps/web/generated/recipes.json   every recipe, exactly as the library defines it
- *   apps/web/generated/relay.json     the source of the live feed's judge, shown on the landing page
  *   apps/web/generated/snippets.json  apps/web/snippets/*.ts (type-checked), minus `// @hide` lines
  *   apps/web/generated/dataset.json   counts from the chat eval set, so the site never overstates it
  *
@@ -16,7 +15,6 @@ import { FLAGS, hasFlag, loadDataset } from "../evals/lib/dataset.js";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 export const GENERATED = `${ROOT}apps/web/generated/`;
-const RELAY_SOURCE = "apps/live-relay/src/judge.ts";
 
 export interface RecipeEntry {
   /** How you'd write it, e.g. `recipes.chat.hateful` or `recipes.chat.spoiler("Elden Ring")`. */
@@ -82,7 +80,6 @@ export function datasetSummary() {
 export function siteData(): Record<string, unknown> {
   return {
     "recipes.json": recipeEntries(),
-    "relay.json": { path: RELAY_SOURCE, source: readFileSync(`${ROOT}${RELAY_SOURCE}`, "utf8") },
     "snippets.json": snippets(),
     "dataset.json": datasetSummary(),
   };

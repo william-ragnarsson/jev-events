@@ -27,7 +27,7 @@ needs no keys. To run one file, add part of its name: `npm run test:smoke -- jev
   watches eight big channels and passes as soon as any of them says something. Set it when none of
   them is live.
 - `TYPESAFE_API_KEY`: runs `jev.smoke.ts`, which makes three real requests. It's skipped when
-  `TYPESAFE_BASE_URL` points at a local stand-in such as `npm run mock-jev`.
+  `TYPESAFE_BASE_URL` points at a local stand-in.
 
 ## Signed-in Twitch
 
