@@ -71,6 +71,9 @@ const INTEGRATIONS: Record<string, string> = {
   calendar: "@jev-events/google",
   slack: "@jev-events/slack",
   twitch: "@jev-events/twitch",
+  outlook: "@jev-events/microsoft",
+  "outlook-calendar": "@jev-events/microsoft",
+  teams: "@jev-events/microsoft",
 };
 const BUILT_IN = ["twitch", "bluesky", "stdin", "webhook"];
 
@@ -92,7 +95,7 @@ const POST_TOPICS = choice("What is this post mainly about?", {
 export function parseSourceSpec(spec: string): { kind: string; target: string } {
   const [kind = "", ...rest] = spec.split(":");
   if (!BUILT_IN.includes(kind) && !INTEGRATIONS[kind]) {
-    throw new UsageError(`Unknown source "${spec}". Try gmail, calendar, slack, twitch, twitch:<channel>, bluesky, stdin or webhook.`);
+    throw new UsageError(`Unknown source "${spec}". Try gmail, calendar, slack, twitch, twitch:<channel>, outlook, outlook-calendar, teams, bluesky, stdin or webhook.`);
   }
   return { kind, target: rest.join(":") };
 }

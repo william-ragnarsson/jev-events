@@ -194,7 +194,7 @@ describe("jev-events errors and help", () => {
 
     const auth = await runCli(["auth", "myspace"], { env });
     expect(auth.code).toBe(2);
-    expect(auth.stderr).toContain("Usage: jev-events auth <google|slack|twitch>");
+    expect(auth.stderr).toContain("Usage: jev-events auth <google|microsoft|slack|twitch>");
   }, 30_000);
 
   it("prints usage", async () => {
