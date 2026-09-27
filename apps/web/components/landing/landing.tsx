@@ -4,6 +4,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { Logo } from '@/components/logo';
 import { site } from '@/lib/site';
 import { archivo } from './fonts';
 import { Hero } from './hero';
@@ -11,7 +12,6 @@ import { Nav } from './nav';
 import { Reveal } from './reveal';
 import { Closing, Integrations, Logos, WhyJev } from './sections';
 import { Story } from './story';
-import { Mark } from './ui';
 import './landing.css';
 
 export function LandingShell({ children }: { children: ReactNode }) {
@@ -44,7 +44,7 @@ function Footer() {
     <footer className="border-t border-[var(--line)]">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-6 px-6 py-10 text-[13px] text-[var(--dim)]">
         <div className="flex items-center gap-2.5 text-[var(--muted)]">
-          <Mark className="size-5" /> {site.name}
+          <Logo className="size-5" /> {site.name}
         </div>
         <p>
           A community project built on{' '}

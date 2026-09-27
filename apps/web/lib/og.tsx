@@ -3,10 +3,13 @@ import { join } from 'node:path';
 
 import { ImageResponse } from 'next/og';
 
+import { Logo } from '@/components/logo';
+import { BRAND } from './brand';
+
 export const OG_SIZE = { width: 1200, height: 630 };
 
 // The dark theme's colors, in hex because the image renderer doesn't read oklch.
-const SIGNAL = '#c0f84f';
+const SIGNAL = BRAND.accent;
 const MUTED = '#a3a3a3';
 const FAINT = '#737373';
 
@@ -53,18 +56,13 @@ export async function renderOgImage({
         justifyContent: 'space-between',
         padding: '64px 72px',
         backgroundColor: '#050505',
-        backgroundImage: 'radial-gradient(circle at 88% -10%, rgba(192, 248, 79, 0.18), transparent 55%)',
+        backgroundImage: 'radial-gradient(circle at 88% -10%, rgba(138, 184, 255, 0.16), transparent 55%)',
         color: '#fafafa',
         fontFamily: 'Geist',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-        <svg width="52" height="52" viewBox="0 0 32 32">
-          <rect x="0.5" y="0.5" width="31" height="31" rx="7.5" fill="#0a0a0a" stroke="#262626" />
-          <rect x="7" y="8.5" width="11" height="3" rx="1.5" fill="#fafafa" opacity="0.55" />
-          <rect x="7" y="14.5" width="18" height="3" rx="1.5" fill={SIGNAL} />
-          <rect x="7" y="20.5" width="8" height="3" rx="1.5" fill="#fafafa" opacity="0.55" />
-        </svg>
+        <Logo width={52} height={52} />
         <div style={{ fontSize: 34, letterSpacing: -0.5 }}>Jev Events</div>
         {eyebrow && (
           <div style={{ display: 'flex', marginLeft: 14, fontFamily: 'Geist Mono', fontSize: 22, color: FAINT }}>
