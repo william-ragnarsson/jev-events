@@ -1,33 +1,24 @@
-import { silentLogger, type Logger, type Source, type SourceContext } from "jev-events";
+import { needsSignIn, type ConnectedSource, type PushContext, type SessionContext, type SourceContext } from "jev-events";
 
 import { isFatal, SlackApi, SlackApiError } from "./api.js";
-import type { SlackAuth } from "./auth.js";
+import type { SlackApp } from "./app.js";
+import { tokensOf } from "./auth.js";
 import { conversationLabel, Directory, kindFromChannelType, type SlackConversation } from "./directory.js";
 import { handleEventsRequest } from "./events-api.js";
 import { botAuthor, channelTypeOf, messageItem, type SlackMessageEvent, type SlackMessageItem } from "./item.js";
-import { socketMode, type EventCallback } from "./socket.js";
+import { sharedSocket, teamsOf, type EventCallback } from "./socket.js";
 import { mentionsIn } from "./text.js";
 
-/** How new messages reach the source: Socket Mode, or Slack's Events API posting to your URL. */
-export type Delivery = "socket" | "events";
-
 export interface MessagesOptions {
-  /** The connected workspace, e.g. `slack.auth.fromFile()`. */
-  auth: SlackAuth;
   /** Only these channels, by name ("general" or "#general") or ID. Default: every conversation the app is in. */
   channels?: readonly string[];
   /** Also emit this many of the latest messages already there when starting. Default 0. */
   backfill?: number;
-  /**
-   * "socket" (Socket Mode) needs the app-level token and no public URL. "events" (the Events API) needs
-   * the signing secret, and a public URL whose requests you pass to `source.handle()`. Default:
-   * "socket" when there's an app-level token, otherwise "events".
-   */
-  delivery?: Delivery;
   /** Also judge messages from bots and integrations. The app's own messages are always skipped. Default false. */
   includeBots?: boolean;
 }
 
+/** What the messages source and the Slack actions use for one connected workspace. */
 export interface SlackSession {
   api: SlackApi;
   directory: Directory;
@@ -41,19 +32,11 @@ export interface SlackSession {
   botId?: string;
   /** The workspace's address, e.g. "https://acme.slack.com/". */
   url: string;
-  /** What's watched: the channels you named, or every conversation the app was in when it started. */
-  conversations: SlackConversation[];
+  /** What's watched once the source has started: the channels you named, or every conversation the app was in. */
+  conversations?: SlackConversation[];
 }
 
-export interface SlackMessagesSource extends Source<SlackMessageItem, "slack"> {
-  /** Set once the source has started. Actions use it. */
-  readonly session: SlackSession | undefined;
-  /**
-   * For the Events API: pass each request Slack sends to your URL, and return the response.
-   * Works as a Next.js route handler: `export const POST = (request) => source.handle(request)`.
-   */
-  handle(request: Request): Promise<Response>;
-}
+export type SlackMessagesSource = ConnectedSource<SlackMessageItem, "slack", SlackSession>;
 
 interface AuthTest {
   url: string;
@@ -70,75 +53,56 @@ const SEEN_LIMIT = 5_000;
 /** Backfill reads at most this many conversations. */
 const BACKFILL_CONVERSATIONS = 20;
 
-/** New messages in the channels, private channels and direct messages the Slack app is in. */
-export function messages(options: MessagesOptions): SlackMessagesSource {
-  let session: SlackSession | undefined;
-  let deliver: ((payload: EventCallback) => void) | undefined;
-  let log: Logger = silentLogger;
+const NO_SIGNING_SECRET =
+  "Slack's Events API needs your app's signing secret, from Basic Information → App Credentials: set SLACK_SIGNING_SECRET, or pass runtime({ apps: [slack.app({ signingSecret })] }).";
+
+/** App-level tokens by session, kept out of the session itself so handlers never see them. */
+const appTokens = new WeakMap<SlackSession, string>();
+
+/**
+ * New messages in the channels, private channels and direct messages the Slack app is in, in each
+ * connected workspace. They arrive over Socket Mode when the connection (or `slack.app()`) has an
+ * app-level token, and otherwise through the Events API at your runtime's `/webhook/slack`.
+ */
+export function messages(options: MessagesOptions = {}): SlackMessagesSource {
   const named = options.channels?.map((channel) => channel.trim().replace(/^#/, "")).filter(Boolean) ?? [];
+  const id = named.length > 0 ? `slack:${named.map((name) => `#${name}`).join(",")}` : "slack:messages";
+  const strangers = new Set<string>();
+
+  /** Named channels by ID or name. The app gets events only from conversations it's in. */
+  const watches = async (session: SlackSession, channel: string): Promise<boolean> => {
+    if (named.length === 0 || named.includes(channel)) return true;
+    const conversation = await session.directory.conversation(channel);
+    return conversation.name !== undefined && named.includes(conversation.name);
+  };
 
   return {
-    id: named.length > 0 ? `slack:${named.map((name) => `#${name}`).join(",")}` : "slack:messages",
+    id,
     platform: "slack",
     noun: "message",
     canAct: true,
-    get session() {
-      return session;
-    },
-    async handle(request) {
-      const signingSecret = options.auth.signingSecret;
-      if (!signingSecret) {
-        return Response.json(
-          { error: "No signing secret. Pass it to receive Slack's Events API: slack.auth.withTokens({ token, signingSecret })." },
-          { status: 500 },
-        );
-      }
-      return handleEventsRequest(request, { signingSecret, deliver, log });
-    },
+    integration: "slack",
+    session: (ctx) => openSession(ctx, id),
     async start(ctx) {
-      log = ctx.log;
-      const delivery = chooseDelivery(options);
-      const api = new SlackApi(options.auth.token);
-      const me = await api.call<AuthTest>("auth.test");
-      const directory = new Directory(api, me.team_id, (message) => ctx.log.warn(message));
-      const watched = named.length > 0 ? await findChannels(directory, named, me.user) : undefined;
-      const current: SlackSession = {
-        api,
-        directory,
-        team: me.team,
-        teamId: me.team_id,
-        userId: me.user_id,
-        user: me.user,
-        ...(me.bot_id ? { botId: me.bot_id } : {}),
-        url: me.url,
-        conversations: watched ?? (await directory.mine()),
-      };
-      session = current;
+      const session = ctx.session;
+      const watched = named.length > 0 ? await findChannels(session.directory, named, session.user) : undefined;
+      session.conversations = watched ?? (await session.directory.mine());
       const only = watched ? new Set(watched.map((conversation) => conversation.id)) : undefined;
-
-      /** Skip what isn't someone saying something: joins, edits, the app's own posts and, by default, bots. */
-      const wanted = (event: SlackMessageEvent): boolean => {
-        if (event.type !== "message" || event.hidden || !event.channel || !event.ts) return false;
-        if (!SAID.has(event.subtype)) return false;
-        if (only && !only.has(event.channel)) return false;
-        if (event.user === current.userId || (event.bot_id !== undefined && event.bot_id === current.botId)) return false;
-        if ((event.bot_id !== undefined || event.subtype === "bot_message") && !options.includeBots) return false;
-        return Boolean(event.text?.trim() || event.files?.length);
-      };
+      const wanted = (event: SlackMessageEvent) => said(event, session, options) && (!only || only.has(event.channel as string));
 
       // One at a time and in order, each message once, however it arrived.
       const seen = new Set<string>();
       let queue = Promise.resolve();
       const enqueue = (event: SlackMessageEvent) => {
         if (!wanted(event)) return;
-        const id = `${event.channel}:${event.ts}`;
-        if (seen.has(id)) return;
-        seen.add(id);
+        const key = `${event.channel}:${event.ts}`;
+        if (seen.has(key)) return;
+        seen.add(key);
         if (seen.size > SEEN_LIMIT) seen.delete(seen.values().next().value as string);
         queue = queue.then(async () => {
+          if (ctx.signal.aborted) return;
           try {
-            const item = await toItem(event, current);
-            if (!ctx.signal.aborted) ctx.emit(item);
+            await ctx.emit(await toItem(event, session));
           } catch (error) {
             ctx.fail(error, { fatal: isFatal(error) });
           }
@@ -154,51 +118,131 @@ export function messages(options: MessagesOptions): SlackMessagesSource {
         else enqueue(event);
       };
 
-      if (delivery === "socket") {
-        await socketMode({
-          api: new SlackApi(options.auth.appToken as string),
+      const appToken = appTokens.get(session);
+      if (appToken) {
+        await sharedSocket({
+          appToken,
+          api: new SlackApi(appToken),
+          teamId: session.teamId,
           signal: ctx.signal,
           log: ctx.log,
           onEvent: receive,
           onFatal: (error) => ctx.fail(error, { fatal: true }),
         });
+      } else {
+        ctx.log.info(`slack: ${session.team} has no app-level token, so its new messages come through the Events API at /webhook/slack.`);
       }
-      deliver = receive;
-      ctx.signal.addEventListener("abort", () => (deliver = undefined), { once: true });
 
-      if (options.backfill) {
-        void latest(current, options.backfill, wanted, ctx)
-          .then(
-            (events) => events.forEach(enqueue),
-            (error: unknown) => ctx.fail(error, { fatal: isFatal(error) }),
-          )
-          .finally(() => {
-            const live = held ?? [];
-            held = undefined;
-            live.forEach(enqueue);
-          });
+      if (!options.backfill) {
+        ctx.end();
+        return;
       }
+      void latest(session, options.backfill, wanted, ctx)
+        .then(
+          (events) => events.forEach(enqueue),
+          (error: unknown) => ctx.fail(error, { fatal: isFatal(error) }),
+        )
+        .finally(() => {
+          const live = held ?? [];
+          held = undefined;
+          live.forEach(enqueue);
+          queue = queue.then(() => ctx.end());
+        });
     },
+    async receive(request, ctx) {
+      const app = ctx.app as Partial<SlackApp> | undefined;
+      const signingSecret = app?.signingSecret ?? (process.env.SLACK_SIGNING_SECRET || undefined);
+      if (!signingSecret) {
+        ctx.log.error(NO_SIGNING_SECRET);
+        return Response.json({ error: NO_SIGNING_SECRET }, { status: 500 });
+      }
+      const payloads: EventCallback[] = [];
+      const response = await handleEventsRequest(request, { signingSecret, deliver: (payload) => payloads.push(payload), log: ctx.log });
+      for (const payload of payloads) await pushed(payload, ctx);
+      return response;
+    },
+  };
+
+  /** Hand an event from the Events API to the connections of its workspace. */
+  async function pushed(payload: EventCallback, ctx: PushContext<SlackMessageItem, SlackSession>): Promise<void> {
+    const event = payload.event as SlackMessageEvent | undefined;
+    if (event?.type !== "message" || !event.channel) return;
+    const teams = teamsOf(payload);
+    const failures: unknown[] = [];
+    let matched = false;
+    for (const connection of await ctx.connections()) {
+      const saved = connection.facts?.teamId;
+      if (typeof saved === "string" && teams.length > 0 && !teams.includes(saved)) continue;
+      try {
+        const session = await ctx.session(connection);
+        if (teams.length > 0 && !teams.includes(session.teamId)) continue;
+        matched = true;
+        if (!said(event, session, options) || !(await watches(session, event.channel))) continue;
+        await ctx.emit(connection, await toItem(event, session));
+      } catch (error) {
+        await ctx.fail(connection, error);
+        // Slack sends the event again after an error, which won't help while the token is revoked or
+        // a scope is missing. Answering errors too often makes Slack turn the app's events off.
+        if (!isFatal(error) && !needsSignIn(error)) failures.push(error);
+        matched = true;
+      }
+    }
+    const team = teams[0];
+    if (!matched && team && !strangers.has(team)) {
+      strangers.add(team);
+      ctx.log.warn(`slack: an event came in from workspace ${team}, which isn't connected. Connect it with /connect/slack.`);
+    }
+    // What was already judged is skipped when Slack sends it again.
+    if (failures.length > 0) throw failures[0];
+  }
+}
+
+/** The API client and who the app is in the connected workspace. */
+async function openSession(ctx: SessionContext, source: string): Promise<SlackSession> {
+  const { connection } = ctx;
+  if (!connection) {
+    throw new Error(`${source} reads connected Slack workspaces, so it needs a connection. Connect one with npx jev-events auth slack, or pass connections to start().`);
+  }
+  const { token, appToken: saved } = tokensOf(connection);
+  const app = ctx.app as Partial<SlackApp> | undefined;
+  const appToken = saved ?? app?.appToken ?? (process.env.SLACK_APP_TOKEN || undefined);
+  const api = new SlackApi(token);
+  const me = savedIdentity(connection.facts) ?? (await api.call<AuthTest>("auth.test"));
+  const session: SlackSession = {
+    api,
+    directory: new Directory(api, me.team_id, (message) => ctx.log.warn(message)),
+    team: me.team,
+    teamId: me.team_id,
+    userId: me.user_id,
+    user: me.user,
+    ...(me.bot_id ? { botId: me.bot_id } : {}),
+    url: me.url,
+  };
+  if (appToken) appTokens.set(session, appToken);
+  return session;
+}
+
+/** Who the app is, as `jev-events auth slack` and `/connect/slack` saved it, to skip asking Slack each time. */
+function savedIdentity(facts: Record<string, unknown> | undefined): AuthTest | undefined {
+  const { team, teamId, userId, user, url, botId } = facts ?? {};
+  if (typeof teamId !== "string" || typeof userId !== "string" || typeof user !== "string" || typeof url !== "string") return undefined;
+  return {
+    team: typeof team === "string" ? team : teamId,
+    team_id: teamId,
+    user_id: userId,
+    user,
+    url,
+    ...(typeof botId === "string" ? { bot_id: botId } : {}),
   };
 }
 
-function chooseDelivery(options: MessagesOptions): Delivery {
-  const { appToken, signingSecret } = options.auth;
-  const delivery = options.delivery ?? (appToken ? "socket" : signingSecret ? "events" : undefined);
-  if (!delivery) {
-    throw new Error(
-      "Slack needs a way to deliver new messages: an app-level token (xapp-…) for Socket Mode, or a signing secret for the Events API. npx jev-events auth slack sets up Socket Mode.",
-    );
-  }
-  if (delivery === "socket" && !appToken) {
-    throw new Error(
-      "Socket Mode needs the app-level token (xapp-…): slack.auth.withTokens({ token, appToken }). Make one under Basic Information → App-Level Tokens, with the connections:write scope.",
-    );
-  }
-  if (delivery === "events" && !signingSecret) {
-    throw new Error("The Events API needs the app's signing secret, from Basic Information → App Credentials: slack.auth.withTokens({ token, signingSecret }).");
-  }
-  return delivery;
+/** Someone saying something: not a join, an edit, the app's own post or, by default, a bot. */
+function said(event: SlackMessageEvent, session: SlackSession, options: MessagesOptions): boolean {
+  if (event.type !== "message" || event.hidden || !event.channel || !event.ts) return false;
+  if (!SAID.has(event.subtype)) return false;
+  if (event.user === session.userId || (event.bot_id !== undefined && event.bot_id === session.botId)) return false;
+  if ((event.bot_id !== undefined || event.subtype === "bot_message") && !options.includeBots) return false;
+  return Boolean(event.text?.trim() || event.files?.length);
 }
 
 /** The named channels, which the app must be in to read. */
@@ -217,11 +261,11 @@ async function latest(
   session: SlackSession,
   count: number,
   wanted: (event: SlackMessageEvent) => boolean,
-  ctx: SourceContext<SlackMessageItem>,
+  ctx: SourceContext<SlackMessageItem, SlackSession>,
 ): Promise<SlackMessageEvent[]> {
   const warned = new Set<string>();
   const perConversation = await Promise.all(
-    session.conversations.slice(0, BACKFILL_CONVERSATIONS).map(async (conversation) => {
+    (session.conversations ?? []).slice(0, BACKFILL_CONVERSATIONS).map(async (conversation) => {
       try {
         const history = await session.api.call<{ messages?: SlackMessageEvent[] }>("conversations.history", {
           channel: conversation.id,

@@ -91,7 +91,7 @@ describe("Directory", () => {
     slack.revoke();
 
     await expect(directory.user(ANN)).rejects.toThrow(SlackApiError);
-    await expect(directory.conversation(GENERAL)).rejects.toThrow("Slack signed you out (token_revoked)");
+    await expect(directory.conversation(GENERAL)).rejects.toThrow("Slack signed this workspace out (token_revoked)");
   });
 
   it("looks conversations up once, and guesses the kind when Slack can't say", async () => {

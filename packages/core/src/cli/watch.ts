@@ -10,8 +10,9 @@ import {
   type Questions,
 } from "@typesafe-ai/sdk";
 
+import type { Connection } from "../connection.js";
 import { createLogger } from "../logger.js";
-import { monitor } from "../monitor/index.js";
+import { coreOf, monitor } from "../monitor/index.js";
 import { bluesky } from "../public/bluesky.js";
 import { twitchChat } from "../public/twitch.js";
 import { recipes } from "../recipes.js";
@@ -50,10 +51,18 @@ export interface WatchHook {
   source(target: string): AnySource | Promise<AnySource>;
   /** Asked when you don't pass questions yourself. */
   questions: Questions;
-  /** Printed once the source is connected, e.g. "Showing your 5 latest emails, then new ones as they arrive." */
-  connected?: string | ((source: AnySource) => string);
+  /**
+   * Printed once the source is connected, e.g. "Showing your 5 latest emails, then new ones as they
+   * arrive." A function gets the source and what its `session()` returned for each connection.
+   */
+  connected?: string | ((source: AnySource, sessions: unknown[]) => string);
   /** What `jev-events auth` connects, for "Connect your Google account first". */
   account?: string;
+  /**
+   * A connection built from environment variables, such as SLACK_BOT_TOKEN, to watch instead of the
+   * ones `jev-events auth` saved. Undefined when they aren't set.
+   */
+  fromEnv?(): Connection | undefined;
 }
 
 /** Sources that live in an integration package, and the package that has them. */
@@ -214,7 +223,8 @@ export async function watch(sourceSpec: string | undefined, flags: WatchFlags): 
   const filter = flags.filter ? new RegExp(flags.filter, "i") : undefined;
   // Before the key prompt, so "connect your account first" comes before being asked for a key.
   const source = await resolveSource(kind, target, flags, hook);
-  if (source.integration) await ensureConnected(source.integration, hook);
+  const envConnection = source.integration ? hook?.fromEnv?.() : undefined;
+  if (source.integration && !envConnection) await ensureConnected(source.integration, hook);
   await ensureApiKey(kind !== "stdin" && Boolean(process.stdin.isTTY && process.stdout.isTTY));
   const client = new TypeSafeClient();
 
@@ -254,7 +264,11 @@ export async function watch(sourceSpec: string | undefined, flags: WatchFlags): 
       process.exit(2);
     }
     const reason = event.error instanceof Error ? event.error.message : String(event.error);
-    const signIn = event.needsSignIn && source.integration ? ` Sign in again: npx jev-events auth ${source.integration}` : "";
+    const signIn = !event.needsSignIn || !source.integration
+      ? ""
+      : envConnection
+        ? ` Check ${envConnection.label ?? "the environment variables"}.`
+        : ` Sign in again: npx jev-events auth ${source.integration}`;
     const message = forThisShell(`${reason}${signIn}`);
     if (event.fatal) {
       // The source stopped, such as when the account was signed out; say why, and once no account
@@ -295,10 +309,12 @@ export async function watch(sourceSpec: string | undefined, flags: WatchFlags): 
     if (!flags.json) process.stdout.write(`\n${formatSummary(stats)}\n`);
     return;
   }
-  await watching.start(source.integration ? { store: watchStore() } : {});
+  // Environment connections stay in memory; saved ones are read from, and renewed in, .jev-events.
+  await watching.start(envConnection ? { connections: [envConnection] } : source.integration ? { store: watchStore() } : {});
   if (flags.json) return;
   if (hook) {
-    const connected = typeof hook.connected === "function" ? hook.connected(source) : hook.connected;
+    const sessions = [...coreOf(watching).runs].map((run) => run.session);
+    const connected = typeof hook.connected === "function" ? hook.connected(source, sessions) : hook.connected;
     process.stdout.write(paint("gray", `  connected. ${connected ?? `Waiting for new ${source.noun ?? "item"}s…`}\n\n`));
   }
   else if (kind === "twitch") process.stdout.write(paint("gray", "  connected. Waiting for chat…\n\n"));

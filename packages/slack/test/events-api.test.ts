@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Logger } from "jev-events";
-import { handleEventsRequest, messages, slackSignature, withTokens, type EventCallback } from "@jev-events/slack";
+import { memoryStore, monitor, noul, runtime, silentLogger, toConnection, type Connection, type ErrorEvent, type JudgedEvent, type Logger } from "jev-events";
+import { mockJev } from "jev-events/testing";
+import { app, handleEventsRequest, messages, slackSignature, type EventCallback, type SlackMessageItem } from "@jev-events/slack";
 
-import { ANN, APP_TOKEN, BOT_TOKEN, fakeSlack, GENERAL, type FakeSlack } from "./fake-slack.js";
-import { startSource, waitFor } from "./helpers.js";
+import { ANN, callback, fakeSlack, GENERAL, RANDOM, type FakeMessage, type FakeSlack } from "./fake-slack.js";
+import { connectionTo } from "./helpers.js";
 
 const SECRET = "8f742231b10e8888abcd99yyyzzz85a5";
 const NOW = 1_760_000_000_000;
@@ -19,9 +20,9 @@ const message: EventCallback = {
 };
 
 /** A request as Slack signs it. */
-function signed(body: string, options: { secret?: string; timestamp?: number } = {}): Request {
+function signed(body: string, options: { secret?: string; timestamp?: number; url?: string } = {}): Request {
   const timestamp = String(options.timestamp ?? Math.floor(NOW / 1000));
-  return new Request(URL, {
+  return new Request(options.url ?? URL, {
     method: "POST",
     headers: { "content-type": "application/json", "x-slack-request-timestamp": timestamp, "x-slack-signature": slackSignature(options.secret ?? SECRET, timestamp, body) },
     body,
@@ -107,7 +108,7 @@ describe("handleEventsRequest", () => {
   });
 });
 
-describe("the messages source with the Events API", () => {
+describe("slack.messages() through runtime().handle()", () => {
   let slack: FakeSlack;
 
   beforeEach(async () => {
@@ -115,39 +116,156 @@ describe("the messages source with the Events API", () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     await slack.close();
   });
 
-  /** Signed now, since source.handle uses the real clock. */
-  const signedNow = (payload: object) => signed(JSON.stringify(payload), { timestamp: Math.floor(Date.now() / 1000) });
+  const needsAnswer = noul("Does this message need an answer from the team?");
 
-  it("receives messages from requests you pass to handle(), with no Socket Mode connection", async () => {
-    const source = messages({ auth: withTokens({ token: BOT_TOKEN, signingSecret: SECRET }) });
-    const check = await source.handle(signedNow({ type: "url_verification", challenge: "abc" }));
-    const early = await source.handle(signedNow(message));
-    const run = startSource(source);
-    await run.started;
-    const response = await source.handle(signedNow(message));
-    await waitFor(() => run.items.length === 1);
-    run.stop();
-    const late = await source.handle(signedNow(message));
+  /** A web app's runtime for the fake workspace, connected without an app-level token as `/connect/slack` saves it. */
+  function webApp(options: { signingSecret?: string; source?: ReturnType<typeof messages>; connection?: Connection } = {}) {
+    const judged: SlackMessageItem[] = [];
+    const errors: ErrorEvent[] = [];
+    const warnings: string[] = [];
+    const log: Logger = { ...quiet, warn: (line) => void warnings.push(line), error: (line) => void warnings.push(line) };
+    const team = monitor({ source: options.source ?? messages(), questions: { needsAnswer }, client: mockJev(() => ({ needsAnswer: 0.2 })), log })
+      .on("judged", (e: JudgedEvent<SlackMessageItem>) => void judged.push(e.item))
+      .on("error", (e) => void errors.push(e));
+    const jev = runtime({
+      monitors: [team],
+      store: memoryStore(),
+      connections: [options.connection ?? connectionTo(slack, { appToken: false })],
+      apps: [app(options.signingSecret === undefined ? { signingSecret: SECRET } : options.signingSecret ? { signingSecret: options.signingSecret } : {})],
+      log: silentLogger,
+    });
+    return { jev, judged, errors, warnings };
+  }
 
-    expect(check.status).toBe(200);
-    expect(await check.json()).toEqual({ challenge: "abc" });
-    expect(early.status).toBe(503);
+  /** What Slack sends to the Request URL when someone says something, signed now, since the runtime uses the real clock. */
+  function event(message: FakeMessage, options: { id?: string; team?: string } = {}): Request {
+    const said = slack.post({ ...message, live: false });
+    return signedNow(callback({ ...said, event_ts: said.ts }, options.id ?? "Ev1", options.team));
+  }
+
+  const signedNow = (payload: object) =>
+    signed(JSON.stringify(payload), { timestamp: Math.floor(Date.now() / 1000), url: "https://example.com/api/jev/webhook/slack" });
+
+  it("judges messages Slack sends to /webhook/slack, with no Socket Mode connection", async () => {
+    const { jev, judged, errors } = webApp();
+    const response = await jev.handle(event({ channel: GENERAL, text: "Is prod down?" }));
+
     expect(response.status).toBe(200);
-    expect(run.items[0]).toMatchObject({ text: "Is prod down?", author: { name: "Ann Smith" }, channel: { id: GENERAL, name: "general" } });
+    expect(judged).toMatchObject([{ text: "Is prod down?", author: { id: ANN, name: "Ann Smith" }, channel: { id: GENERAL, name: "general" } }]);
+    expect(errors).toEqual([]);
     expect(slack.calls("apps.connections.open")).toEqual([]);
-    expect(late.status).toBe(503);
+    expect(slack.calls("auth.test")).toEqual([]);
+  });
+
+  it("answers Slack's check of the Request URL", async () => {
+    const { jev } = webApp();
+    const response = await jev.handle(signedNow({ type: "url_verification", challenge: "abc" }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ challenge: "abc" });
+  });
+
+  it("judges a message once when Slack sends it again", async () => {
+    const { jev, judged } = webApp();
+    const first = event({ channel: GENERAL, text: "Is prod down?" });
+    const again = first.clone();
+
+    await jev.handle(first);
+    await jev.handle(again);
+
+    expect(judged.map((item) => item.text)).toEqual(["Is prod down?"]);
+  });
+
+  it("reads only the channels it was given", async () => {
+    const { jev, judged } = webApp({ source: messages({ channels: ["random"] }) });
+    await jev.handle(event({ channel: GENERAL, text: "Is prod down?" }, { id: "Ev1" }));
+    await jev.handle(event({ channel: RANDOM, text: "Lunch?" }, { id: "Ev2" }));
+
+    expect(judged.map((item) => item.text)).toEqual(["Lunch?"]);
+  });
+
+  it("warns once about events from a workspace that isn't connected", async () => {
+    const { jev, judged, warnings } = webApp();
+    await jev.handle(event({ channel: GENERAL, text: "Is prod down?" }, { id: "Ev1", team: "T0OTHER" }));
+    await jev.handle(event({ channel: GENERAL, text: "Anyone?" }, { id: "Ev2", team: "T0OTHER" }));
+
+    expect(judged).toEqual([]);
+    expect(warnings).toEqual(["slack: an event came in from workspace T0OTHER, which isn't connected. Connect it with /connect/slack."]);
+  });
+
+  it("refuses requests that Slack didn't sign", async () => {
+    const { jev, judged } = webApp({ signingSecret: "another-secret" });
+    const response = await jev.handle(event({ channel: GENERAL, text: "Is prod down?" }));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Invalid signature. Check the signing secret." });
+    expect(judged).toEqual([]);
   });
 
   it("says it needs the signing secret", async () => {
-    const source = messages({ auth: withTokens({ token: BOT_TOKEN, appToken: APP_TOKEN }) });
-    const response = await source.handle(signedNow(message));
+    vi.stubEnv("SLACK_SIGNING_SECRET", "");
+    const { jev, warnings } = webApp({ signingSecret: "" });
+    const response = await jev.handle(event({ channel: GENERAL, text: "Is prod down?" }));
+    const message =
+      "Slack's Events API needs your app's signing secret, from Basic Information → App Credentials: set SLACK_SIGNING_SECRET, or pass runtime({ apps: [slack.app({ signingSecret })] }).";
 
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({
-      error: "No signing secret. Pass it to receive Slack's Events API: slack.auth.withTokens({ token, signingSecret }).",
-    });
+    expect(await response.json()).toEqual({ error: message });
+    expect(warnings).toEqual([message]);
+  });
+
+  it("takes the signing secret from SLACK_SIGNING_SECRET", async () => {
+    vi.stubEnv("SLACK_SIGNING_SECRET", SECRET);
+    const { jev, judged } = webApp({ signingSecret: "" });
+    const response = await jev.handle(event({ channel: GENERAL, text: "Is prod down?" }));
+
+    expect(response.status).toBe(200);
+    expect(judged).toHaveLength(1);
+  });
+
+  it("asks Slack to send an event again when reading it failed, and judges it once", async () => {
+    // Without account facts, the session asks Slack who the app is.
+    const { facts: _facts, ...bare } = slack.connection({ appToken: false });
+    slack.fail("auth.test", "internal_error");
+    const { jev, judged, errors } = webApp({ connection: toConnection("slack", bare) });
+    const request = event({ channel: GENERAL, text: "Is prod down?" });
+    const again = request.clone();
+
+    const failed = await jev.handle(request);
+    const retried = await jev.handle(again);
+
+    expect(failed.status).toBe(500);
+    expect(errors).toMatchObject([{ phase: "source", connection: { label: "Acme" }, error: { message: "Slack auth.test failed: internal_error." } }]);
+    expect(retried.status).toBe(200);
+    expect(judged.map((item) => item.text)).toEqual(["Is prod down?"]);
+  });
+
+  it("marks the workspace as needing a new sign-in when Slack signed the app out", async () => {
+    slack.revoke();
+    const { jev, judged, errors } = webApp();
+    const response = await jev.handle(event({ channel: GENERAL, text: "Is prod down?" }));
+    const saved = await jev.store.connections.list({ integration: "slack" });
+
+    // Sending it again won't help until someone connects the workspace again.
+    expect(response.status).toBe(200);
+    expect(judged).toEqual([]);
+    expect(errors).toMatchObject([{ needsSignIn: true, fatal: true, connection: { label: "Acme" } }]);
+    expect(saved).toMatchObject([
+      { status: "needs-sign-in", problem: "Slack signed this workspace out (token_revoked): the token was revoked or isn't valid." },
+    ]);
+  });
+
+  it("reports a missing scope without asking Slack to send the event again", async () => {
+    slack.removeScope("users:read");
+    const { jev, judged, errors } = webApp();
+    const response = await jev.handle(event({ channel: GENERAL, text: "Is prod down?" }));
+
+    expect(response.status).toBe(200);
+    expect(judged).toEqual([]);
+    expect(errors).toMatchObject([{ error: { message: expect.stringContaining("the app lacks the users:read scope") } }]);
   });
 });

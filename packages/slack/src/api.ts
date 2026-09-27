@@ -39,12 +39,17 @@ export class SlackApiError extends Error {
   get signedOut(): boolean {
     return SIGNED_OUT.has(this.code);
   }
+
+  /** The workspace has to be connected again, so runtimes stop reading it until then. */
+  get needsSignIn(): boolean {
+    return this.signedOut;
+  }
 }
 
 function describe(method: string, code: string, needed: string | undefined): string {
-  if (SIGNED_OUT.has(code)) return `Slack signed you out (${code}): the token was revoked or isn't valid. Connect again: npx jev-events auth slack`;
+  if (SIGNED_OUT.has(code)) return `Slack signed this workspace out (${code}): the token was revoked or isn't valid.`;
   if (code === "missing_scope") {
-    return `Slack ${method} failed: the app lacks the ${needed ?? "needed"} scope. Add it under OAuth & Permissions → Scopes, reinstall the app, then run: npx jev-events auth slack`;
+    return `Slack ${method} failed: the app lacks the ${needed ?? "needed"} scope. Add it under OAuth & Permissions → Scopes, then reinstall the app to the workspace.`;
   }
   const hint = HINTS[code];
   return `Slack ${method} failed: ${code}${hint ? ` (${hint})` : ""}.`;
@@ -65,11 +70,12 @@ export interface SlackApiOptions {
 
 /** Slack Web API calls: bearer auth, `ok: false` as errors, and retries on rate limits and outages. */
 export class SlackApi {
-  readonly #token: string;
+  readonly #token: string | undefined;
   readonly #baseUrl: string;
   readonly #retryBaseMs: number;
 
-  constructor(token: string, options: SlackApiOptions = {}) {
+  /** `token` is left out only for methods that take none, such as `oauth.v2.access`. */
+  constructor(token: string | undefined, options: SlackApiOptions = {}) {
     this.#token = token;
     this.#baseUrl = options.baseUrl ?? apiUrl();
     this.#retryBaseMs = options.retryBaseMs ?? 1_000;
@@ -83,7 +89,10 @@ export class SlackApi {
     for (let retries = 0; ; retries++) {
       const response = await fetch(`${this.#baseUrl}/${method}`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${this.#token}`, "Content-Type": "application/x-www-form-urlencoded" },
+        headers: {
+          ...(this.#token ? { Authorization: `Bearer ${this.#token}` } : {}),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
         body,
       });
       const text = await response.text();

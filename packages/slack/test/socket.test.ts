@@ -131,7 +131,7 @@ describe("socketMode", () => {
     await waitFor(() => fatal.length === 1);
 
     expect(fatal[0]).toBeInstanceOf(SocketModeError);
-    expect(fatal[0]?.message).toBe("Slack refused the app-level token (token_revoked). Connect again: npx jev-events auth slack");
+    expect(fatal[0]?.message).toBe("Slack refused the app-level token (token_revoked): it was revoked or isn't valid.");
   });
 
   it("gives up on a connection Slack never says hello on", async () => {
@@ -143,7 +143,7 @@ describe("socketMode", () => {
 
   it.each([
     ["the bot token", () => ({ token: BOT_TOKEN }), "Socket Mode needs the app-level token (xapp-…), from Basic Information → App-Level Tokens, not the xoxb- token."],
-    ["a wrong token", () => ({ token: "xapp-1-wrong" }), "Slack refused the app-level token (invalid_auth). Connect again: npx jev-events auth slack"],
+    ["a wrong token", () => ({ token: "xapp-1-wrong" }), "Slack refused the app-level token (invalid_auth): it was revoked or isn't valid."],
     [
       "a token without connections:write",
       () => (slack.appTokenWithoutScope(), {}),

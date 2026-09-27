@@ -5,10 +5,19 @@ import { SlackApiError, type SlackApi } from "./api.js";
 /** What Slack wraps each event in: an `event_callback`, from Socket Mode or the Events API. */
 export interface EventCallback {
   type: string;
+  /** The workspace the event happened in. */
   team_id?: string;
+  /** The installation the event was sent for, which differs from `team_id` in channels shared with other workspaces. */
+  authorizations?: { team_id?: string | null }[];
   event_id?: string;
   event_time?: number;
   event?: { type: string; [key: string]: unknown };
+}
+
+/** The workspaces an event could be for: the installation it was sent for, and where it happened. */
+export function teamsOf(payload: EventCallback): string[] {
+  const teams = (payload.authorizations ?? []).map((authorization) => authorization.team_id);
+  return [...new Set([...teams, payload.team_id].filter((team): team is string => typeof team === "string" && team !== ""))];
 }
 
 interface Envelope {
@@ -168,15 +177,15 @@ async function openConnection(api: SlackApi): Promise<{ url: string }> {
     if (error.code === "missing_scope") {
       throw new SocketModeError("The app-level token lacks the connections:write scope. Make a new one under Basic Information → App-Level Tokens with that scope.");
     }
-    if (error.signedOut) {
-      throw new SocketModeError(`Slack refused the app-level token (${error.code}). Connect again: npx jev-events auth slack`);
-    }
+    if (error.signedOut) throw new SocketModeError(`Slack refused the app-level token (${error.code}): it was revoked or isn't valid.`);
     throw error;
   }
 }
 
-/** A problem with the app-level token or the app's settings, which retrying won't fix. */
+/** The app-level token doesn't work, so the workspace has to be connected again with a good one. Retrying won't help. */
 export class SocketModeError extends Error {
+  readonly needsSignIn = true;
+
   constructor(message: string) {
     super(message);
     this.name = "SocketModeError";
@@ -185,6 +194,104 @@ export class SocketModeError extends Error {
 
 function isSocketFatal(error: unknown): boolean {
   return error instanceof SocketModeError;
+}
+
+export interface SharedSocketOptions {
+  /** The app-level token (xapp-…). Everything using the same one shares a single connection. */
+  appToken: string;
+  /** Calls made with the app-level token, used if this opens the connection. */
+  api: SlackApi;
+  /** The workspace whose events this wants. */
+  teamId: string;
+  /** Aborting it stops the events; the connection closes once nothing else uses it. */
+  signal: AbortSignal;
+  log: Logger;
+  onEvent(payload: EventCallback): void;
+  onFatal(error: Error): void;
+  helloTimeoutMs?: number;
+}
+
+interface Subscriber {
+  readonly teamId: string;
+  readonly log: Logger;
+  onEvent(payload: EventCallback): void;
+  onFatal(error: Error): void;
+}
+
+interface Hub {
+  readonly subscribers: Set<Subscriber>;
+  readonly ready: Promise<void>;
+  close(): void;
+}
+
+const hubs = new Map<string, Hub>();
+
+/**
+ * Socket Mode events for one workspace, over a connection shared by everything with the same
+ * app-level token. Slack spreads an app's events across all its open connections, so two separate
+ * connections would each miss some; the shared one hands each event to the monitors reading that
+ * workspace. Resolves once the connection is ready.
+ */
+export async function sharedSocket(options: SharedSocketOptions): Promise<void> {
+  const { appToken, signal } = options;
+  if (signal.aborted) return;
+  const hub = hubs.get(appToken) ?? openHub(options);
+  const subscriber: Subscriber = { teamId: options.teamId, log: options.log, onEvent: options.onEvent, onFatal: options.onFatal };
+  hub.subscribers.add(subscriber);
+  const leave = () => {
+    hub.subscribers.delete(subscriber);
+    if (hub.subscribers.size === 0) hub.close();
+  };
+  signal.addEventListener("abort", leave, { once: true });
+  try {
+    await hub.ready;
+  } catch (error) {
+    signal.removeEventListener("abort", leave);
+    hub.subscribers.delete(subscriber);
+    if (!signal.aborted) throw error;
+  }
+}
+
+function openHub(options: SharedSocketOptions): Hub {
+  const subscribers = new Set<Subscriber>();
+  const controller = new AbortController();
+  const unclaimed = new Set<string>();
+  // Log through whichever monitor still uses the connection.
+  const via =
+    (level: keyof Logger) =>
+    (message: string, ...args: unknown[]) =>
+      ([...subscribers][0]?.log ?? options.log)[level](message, ...args);
+  const log: Logger = { debug: via("debug"), info: via("info"), warn: via("warn"), error: via("error") };
+  const close = () => {
+    if (hubs.get(options.appToken) === hub) hubs.delete(options.appToken);
+    controller.abort();
+  };
+  const ready = socketMode({
+    api: options.api,
+    signal: controller.signal,
+    log,
+    ...(options.helloTimeoutMs !== undefined ? { helloTimeoutMs: options.helloTimeoutMs } : {}),
+    onEvent: (payload) => {
+      const teams = teamsOf(payload);
+      const wanting = [...subscribers].filter((subscriber) => teams.length === 0 || teams.includes(subscriber.teamId));
+      for (const subscriber of wanting) subscriber.onEvent(payload);
+      const team = teams[0];
+      if (wanting.length === 0 && team && !unclaimed.has(team)) {
+        unclaimed.add(team);
+        log.warn(`slack: events are coming in from workspace ${team}, which no monitor here reads. Connect it, or leave them be.`);
+      }
+    },
+    onFatal: (error) => {
+      close();
+      const told = [...subscribers];
+      subscribers.clear();
+      for (const subscriber of told) subscriber.onFatal(error);
+    },
+  });
+  const hub: Hub = { subscribers, ready, close };
+  hubs.set(options.appToken, hub);
+  ready.catch(() => close());
+  return hub;
 }
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {

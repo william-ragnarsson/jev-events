@@ -91,6 +91,12 @@ export interface PushContext<I extends Item = Item, S = unknown> {
   emit(connection: ConnectionInfo | undefined, item: I): Promise<void>;
   /** The session for a connection, such as an API client to fetch the full item. */
   session(connection: ConnectionInfo): Promise<S>;
+  /**
+   * Report a problem with one connection, such as a revoked token while fetching the full item.
+   * One that needs a new sign-in marks the connection "needs-sign-in". A problem that `session()`
+   * already threw is reported once, however often it's passed here.
+   */
+  fail(connection: ConnectionInfo | undefined, error: unknown): Promise<void>;
 }
 
 export interface ProtectContext<S = unknown> {

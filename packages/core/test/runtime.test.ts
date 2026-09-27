@@ -467,6 +467,38 @@ describe("webhook route", () => {
     expect(errors.map((e) => [e.phase, String(e.error)])).toEqual([["source", "Error: Malformed signature header"]]);
   });
 
+  it("marks a connection whose tokens stopped working while a webhook was handled", async () => {
+    const ann = testConnection("ann");
+    const bob = testConnection("bob");
+    const errors: ErrorEvent[] = [];
+    const source = eventsSource({
+      async receive(_request, ctx) {
+        for (const connection of await ctx.connections()) {
+          const revoked = new SignInError(`${connection.label} revoked access`);
+          if (connection.label === "ann") {
+            await ctx.fail(connection, revoked);
+            // Reported once, however often it's passed.
+            await ctx.fail(connection, revoked);
+          } else {
+            await ctx.emit(connection, { id: "1", text: "hello", at: new Date() });
+          }
+        }
+        return new Response(null, { status: 204 });
+      },
+    });
+    const store = memoryStore();
+    const events = monitor({ source, questions: { urgent }, client: client(), log: silentLogger }).on("error", (e) => void errors.push(e));
+    const jev = runtime({ monitors: [events], store, connections: [ann, bob], log: silentLogger });
+
+    expect((await jev.handle(post("/webhook/test", {}))).status).toBe(204);
+    expect(errors).toMatchObject([
+      { phase: "source", fatal: true, needsSignIn: true, connection: { id: ann.id }, error: { message: "ann revoked access" } },
+    ]);
+    expect(await store.connections.get(ann.id)).toMatchObject({ status: "needs-sign-in", problem: "ann revoked access" });
+    expect((await store.connections.get(bob.id))?.status ?? "active").toBe("active");
+    expect(jev.stats()["test:events"]).toMatchObject({ judged: 1 });
+  });
+
   it("reports once when a webhook is for a connection that was removed", async () => {
     const errors: string[] = [];
     const source = eventsSource({

@@ -1,4 +1,16 @@
-import type { Item, Source, TriggeredEvent } from "jev-events";
+import {
+  connectionInfo,
+  toConnection,
+  type ActionContext,
+  type App,
+  type Connection,
+  type Item,
+  type JsonValue,
+  type Source,
+  type TriggeredEvent,
+} from "jev-events";
+
+import type { FakeSlack } from "./fake-slack.js";
 
 /** Wait until `condition` holds, polling every few milliseconds. */
 export async function waitFor(condition: () => boolean, ms = 2_000, what = "the condition"): Promise<void> {
@@ -9,45 +21,116 @@ export async function waitFor(condition: () => boolean, ms = 2_000, what = "the 
   }
 }
 
-export interface Started<I extends Item> {
-  items: I[];
-  errors: Array<{ error: unknown; fatal: boolean }>;
-  warnings: string[];
-  /** Settles when `source.start()` does. */
-  started: Promise<void>;
-  signal: AbortSignal;
+export const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** The fake workspace as a saved connection. `appToken: false` leaves the app-level token out. */
+export function connectionTo(slack: FakeSlack, options: { appToken?: boolean } = {}): Connection {
+  return toConnection("slack", slack.connection(options));
+}
+
+export interface StreamerOptions {
+  /** Default: none, so the session says a connection is needed. */
+  connection?: Connection;
+  app?: App;
+}
+
+export interface Streamer<I extends Item, S> {
+  /** Open the session the first time, then start the source the way a run does. Settles when `source.start()` does. */
+  start(): Promise<void>;
+  /** The session, opened once and reused, as the runtime does within one run. */
+  session(): Promise<S>;
+  /** What an action gets when it runs on this connection's items. */
+  actionContext(): Promise<ActionContext<S>>;
+  readonly items: I[];
+  /** Problems reported with `ctx.fail()`. A fatal one stops the run, as the runtime does. */
+  readonly errors: Array<{ error: unknown; fatal: boolean }>;
+  readonly warnings: string[];
+  readonly infos: string[];
+  /** True once the source called `ctx.end()`. */
+  readonly ended: boolean;
+  readonly signal: AbortSignal;
   stop(): void;
 }
 
-/** Start a source without a listener, collecting what it emits, reports and logs. */
-export function startSource<I extends Item>(source: Source<I>): Started<I> {
+const running = new Set<{ stop(): void }>();
+
+/** Stop everything started in the test, so no Socket Mode connection outlives its fake Slack. */
+export function stopAll(): void {
+  for (const streamer of running) streamer.stop();
+  running.clear();
+}
+
+/** Run a stream source without a monitor, collecting what it emits, reports and logs. */
+export function streamer<I extends Item, P extends string, S>(source: Source<I, P, S>, options: StreamerOptions = {}): Streamer<I, S> {
   const controller = new AbortController();
   const items: I[] = [];
   const errors: Array<{ error: unknown; fatal: boolean }> = [];
   const warnings: string[] = [];
-  const note = (message: string, ...args: unknown[]) => void warnings.push([message, ...args].map(String).join(" "));
-  const started = Promise.resolve().then(() =>
-    source.start({
-      emit: (item) => void items.push(item),
-      signal: controller.signal,
-      log: { debug: () => {}, info: () => {}, warn: note, error: note },
-      fail: (error, options) => {
-        errors.push({ error, fatal: options?.fatal ?? false });
-        if (options?.fatal) controller.abort();
-      },
-      end: () => {},
-    }),
-  );
-  // Tests that expect start to fail await `started` themselves.
-  started.catch(() => {});
-  return { items, errors, warnings, started, signal: controller.signal, stop: () => controller.abort() };
+  const infos: string[] = [];
+  const { connection } = options;
+  let cursor: JsonValue | undefined;
+  let opened: Promise<S> | undefined;
+  let ended = false;
+  const line = (message: string, args: unknown[]) => [message, ...args].map(String).join(" ");
+  const note = (message: string, ...args: unknown[]) => void warnings.push(line(message, args));
+  const log = { debug: () => {}, info: (message: string, ...args: unknown[]) => void infos.push(line(message, args)), warn: note, error: note };
+
+  const session = () =>
+    (opened ??= Promise.resolve().then(() => {
+      if (!source.session) throw new Error(`${source.id} has no session().`);
+      return source.session({ connection, app: options.app, log, signal: controller.signal, saveCredentials: async () => {} });
+    }));
+
+  const stop = () => controller.abort();
+  running.add({ stop });
+  return {
+    items,
+    errors,
+    warnings,
+    infos,
+    get ended() {
+      return ended;
+    },
+    signal: controller.signal,
+    session,
+    async start() {
+      if (!source.start) throw new Error(`${source.id} has no start().`);
+      const current = await session();
+      await source.start({
+        emit: async (item) => void items.push(item),
+        signal: controller.signal,
+        log,
+        fail: (error, failOptions) => {
+          errors.push({ error, fatal: failOptions?.fatal ?? false });
+          if (failOptions?.fatal) controller.abort();
+        },
+        end: () => {
+          ended = true;
+        },
+        connection: connection ? connectionInfo(connection) : undefined,
+        session: current,
+        cursor: {
+          get: async <T extends JsonValue = JsonValue>() => structuredClone(cursor) as T | undefined,
+          set: async (value) => {
+            cursor = structuredClone(value);
+          },
+        },
+      });
+    },
+    async actionContext() {
+      return { session: await session(), connection: connection ? connectionInfo(connection) : undefined, source, log, signal: controller.signal };
+    },
+    stop,
+  };
 }
 
 /** A triggered event for `item`, to run an action on directly. */
-export function firedOn<I extends Item>(item: I, event = "trigger"): TriggeredEvent<I> {
+export function firedOn<I extends Item>(item: I, event = "trigger", connection?: Connection): TriggeredEvent<I> {
   return {
     item,
     answers: {},
+    connection: connection ? connectionInfo(connection) : undefined,
+    monitor: "test",
     model: "jev-test",
     latencyMs: 5,
     usage: { inputTokens: 100, outputTokens: 0 },

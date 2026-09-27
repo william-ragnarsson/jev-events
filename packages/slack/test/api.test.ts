@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { isFatal, SlackApi, SlackApiError, SlackAuthError } from "@jev-events/slack";
+import { needsSignIn } from "jev-events";
 
 import { ANN_DM, BOT_TOKEN, fakeSlack, GENERAL, OFF_TOPIC, RANDOM, type FakeSlack } from "./fake-slack.js";
 
@@ -57,13 +58,14 @@ describe("SlackApi", () => {
     );
   });
 
-  it("says to connect again when the token was revoked, and that retrying won't help", async () => {
+  it("asks for a new sign-in when the token was revoked, and says retrying won't help", async () => {
     slack.revoke();
 
     const error = await rejection(new SlackApi(BOT_TOKEN).call("auth.test"));
 
     expect(error.signedOut).toBe(true);
-    expect(error.message).toBe("Slack signed you out (token_revoked): the token was revoked or isn't valid. Connect again: npx jev-events auth slack");
+    expect(needsSignIn(error)).toBe(true);
+    expect(error.message).toBe("Slack signed this workspace out (token_revoked): the token was revoked or isn't valid.");
     expect(isFatal(error)).toBe(true);
   });
 
@@ -81,9 +83,10 @@ describe("SlackApi", () => {
 
     expect(error.needed).toBe("reactions:write");
     expect(error.message).toBe(
-      "Slack reactions.add failed: the app lacks the reactions:write scope. Add it under OAuth & Permissions → Scopes, reinstall the app, then run: npx jev-events auth slack",
+      "Slack reactions.add failed: the app lacks the reactions:write scope. Add it under OAuth & Permissions → Scopes, then reinstall the app to the workspace.",
     );
     expect(isFatal(error)).toBe(true);
+    expect(needsSignIn(error)).toBe(false);
   });
 
   it("retries rate limits as soon as Slack's Retry-After allows", async () => {

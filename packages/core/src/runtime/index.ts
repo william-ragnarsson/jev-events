@@ -726,6 +726,20 @@ export class JevRuntime implements Runtime {
         await entry.ready;
         return entry.run.session;
       },
+      fail: async (info: ConnectionInfo | undefined, error: unknown) => {
+        const entry = runFor(info);
+        try {
+          await entry.ready;
+        } catch {
+          // Reported once when the run couldn't open.
+          return;
+        }
+        if (typeof error === "object" && error !== null) {
+          if (reported.has(error)) return;
+          reported.add(error);
+        }
+        entry.run.fail(error);
+      },
     };
   }
 

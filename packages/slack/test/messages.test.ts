@@ -1,45 +1,41 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { messages, withTokens, type MessagesOptions, type SlackMessageItem } from "@jev-events/slack";
+import { app, fromEnv, messages, type MessagesOptions, type SlackMessageItem } from "@jev-events/slack";
 
-import { ANN, ANN_DM, APP_TOKEN, BOB, BOT, BOT_TOKEN, ERIN, fakeSlack, GENERAL, GUEST, RANDOM, type FakeSlack } from "./fake-slack.js";
-import { startSource, waitFor, type Started } from "./helpers.js";
+import { ANN, ANN_DM, BOB, BOT, ERIN, fakeSlack, GENERAL, GUEST, RANDOM, TEAM, type FakeSlack } from "./fake-slack.js";
+import { connectionTo, pause, stopAll, streamer, waitFor } from "./helpers.js";
 
 let slack: FakeSlack;
-let running: Array<Started<SlackMessageItem>> = [];
 
 beforeEach(async () => {
   slack = await fakeSlack();
 });
 
 afterEach(async () => {
-  for (const run of running) run.stop();
-  running = [];
+  stopAll();
+  vi.unstubAllEnvs();
   await slack.close();
 });
 
-const auth = () => withTokens({ token: BOT_TOKEN, appToken: APP_TOKEN });
-
-function start(options: Partial<MessagesOptions> = {}) {
-  const source = messages({ auth: auth(), ...options });
-  const run = startSource(source);
-  running.push(run);
-  return { source, ...run };
+/** The source running for the fake workspace, not yet started. */
+function reading(options: MessagesOptions = {}, connection = connectionTo(slack)) {
+  const source = messages(options);
+  // Not spread: `ended` is a getter.
+  return Object.assign(streamer(source, { connection }), { source });
 }
 
 /** Start watching and wait until it's connected. */
-async function watch(options: Partial<MessagesOptions> = {}) {
-  const started = start(options);
-  await started.started;
-  return started;
+async function watch(options: MessagesOptions = {}) {
+  const run = reading(options);
+  await run.start();
+  return run;
 }
 
 const texts = (items: SlackMessageItem[]) => items.map((item) => item.text);
-const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe("slack.messages", () => {
   it("emits each new message, saying who wrote it and where, with names for mentions", async () => {
-    const { source, items } = await watch();
+    const { source, items, session } = await watch();
     const sent = slack.post({ channel: GENERAL, text: `<@${BOB}> is prod down? See <#${RANDOM}>` });
     await waitFor(() => items.length === 1);
 
@@ -54,8 +50,27 @@ describe("slack.messages", () => {
       permalink: `https://acme.slack.com/archives/${GENERAL}/p${sent.ts.replace(".", "")}`,
     });
     expect(source.id).toBe("slack:messages");
-    expect(source.session).toMatchObject({ team: "Acme", teamId: "T0ACME", user: "jev_events", userId: BOT.userId, url: "https://acme.slack.com/" });
-    expect(source.session?.conversations.map((conversation) => conversation.id)).toEqual([GENERAL, RANDOM, ANN_DM]);
+    expect(source.integration).toBe("slack");
+    const opened = await session();
+    expect(opened).toMatchObject({ team: "Acme", teamId: TEAM.id, user: "jev_events", userId: BOT.userId, botId: BOT.botId, url: TEAM.url });
+    expect(opened.conversations?.map((conversation) => conversation.id)).toEqual([GENERAL, RANDOM, ANN_DM]);
+    // Who the app is was saved with the connection, so starting doesn't ask Slack again.
+    expect(slack.calls("auth.test")).toEqual([]);
+    // The app-level token only opens Socket Mode; everything else uses the bot token.
+    expect(slack.calls().filter((call) => call.method !== "apps.connections.open").every((call) => call.token === "xoxb-1-fake-bot-token")).toBe(true);
+  });
+
+  it("asks Slack who the app is when the connection doesn't say", async () => {
+    const { token, appToken } = slack.connection().credentials;
+    vi.stubEnv("SLACK_BOT_TOKEN", String(token));
+    vi.stubEnv("SLACK_APP_TOKEN", String(appToken));
+    const run = reading({}, fromEnv());
+    await run.start();
+    slack.post({ channel: GENERAL, text: "hello" });
+    await waitFor(() => run.items.length === 1);
+
+    expect(await run.session()).toMatchObject({ team: "Acme", teamId: TEAM.id, user: "jev_events" });
+    expect(slack.calls("auth.test")).toHaveLength(1);
   });
 
   it("knows direct messages and replies in threads", async () => {
@@ -83,12 +98,21 @@ describe("slack.messages", () => {
 
   it("starts with the latest messages, oldest first, then new ones", async () => {
     for (let n = 1; n <= 7; n++) slack.post({ channel: n % 2 ? GENERAL : RANDOM, text: `old ${n}`, live: false });
-    const { items } = await watch({ backfill: 5 });
-    await waitFor(() => items.length === 5);
+    const run = await watch({ backfill: 5 });
+    await waitFor(() => run.items.length === 5);
     slack.post({ channel: RANDOM, text: "new" });
-    await waitFor(() => items.length === 6);
+    await waitFor(() => run.items.length === 6);
 
-    expect(texts(items)).toEqual(["old 3", "old 4", "old 5", "old 6", "old 7", "new"]);
+    expect(texts(run.items)).toEqual(["old 3", "old 4", "old 5", "old 6", "old 7", "new"]);
+    // Ended, so monitor.run() can finish; the socket stays open for monitor.start().
+    expect(run.ended).toBe(true);
+  });
+
+  it("ends at once without a backfill", async () => {
+    const run = await watch();
+
+    expect(run.ended).toBe(true);
+    expect(slack.sockets).toBe(1);
   });
 
   it("holds new messages back while the latest load, so they come out in order", async () => {
@@ -157,7 +181,7 @@ describe("slack.messages", () => {
   it("watches only the channels you name", async () => {
     slack.post({ channel: RANDOM, text: "old random", live: false });
     slack.post({ channel: GENERAL, text: "old general", live: false });
-    const { source, items } = await watch({ channels: ["#general"], backfill: 5 });
+    const { source, items, session } = await watch({ channels: ["#general"], backfill: 5 });
     slack.post({ channel: RANDOM, text: "new random" });
     slack.post({ channel: GENERAL, text: "new general" });
     await waitFor(() => items.length === 2);
@@ -165,59 +189,105 @@ describe("slack.messages", () => {
 
     expect(texts(items)).toEqual(["old general", "new general"]);
     expect(source.id).toBe("slack:#general");
-    expect(source.session?.conversations).toEqual([{ id: GENERAL, name: "general", kind: "channel", member: true }]);
+    expect((await session()).conversations).toEqual([{ id: GENERAL, name: "general", kind: "channel", member: true }]);
     expect(slack.calls("conversations.history").map((call) => call.params.channel)).toEqual([GENERAL]);
-    expect(messages({ auth: auth(), channels: ["general", " #random "] }).id).toBe("slack:#general,#random");
+    expect(messages({ channels: ["general", " #random "] }).id).toBe("slack:#general,#random");
   });
 
   it("says how to add the app to a channel it isn't in yet", async () => {
-    const { started } = start({ channels: ["off-topic"] });
-
-    await expect(started).rejects.toThrow("The app (@jev_events) isn't in #off-topic yet. In Slack, open #off-topic and type: /invite @jev_events");
+    await expect(reading({ channels: ["off-topic"] }).start()).rejects.toThrow(
+      "The app (@jev_events) isn't in #off-topic yet. In Slack, open #off-topic and type: /invite @jev_events",
+    );
     expect(slack.sockets).toBe(0);
   });
 
   it("says when there's no such channel", async () => {
-    await expect(start({ channels: ["#nope"] }).started).rejects.toThrow(
+    await expect(reading({ channels: ["#nope"] }).start()).rejects.toThrow(
       "There's no #nope channel that the app can see. If it's private, invite the app to it first.",
     );
   });
 
-  it.each([
-    [
-      "no app-level token or signing secret",
-      () => ({ auth: withTokens({ token: BOT_TOKEN }) }),
-      "Slack needs a way to deliver new messages: an app-level token (xapp-…) for Socket Mode, or a signing secret for the Events API. npx jev-events auth slack sets up Socket Mode.",
-    ],
-    [
-      "Socket Mode without an app-level token",
-      () => ({ auth: withTokens({ token: BOT_TOKEN, signingSecret: "secret" }), delivery: "socket" as const }),
-      "Socket Mode needs the app-level token (xapp-…): slack.auth.withTokens({ token, appToken }). Make one under Basic Information → App-Level Tokens, with the connections:write scope.",
-    ],
-    [
-      "the Events API without a signing secret",
-      () => ({ auth: auth(), delivery: "events" as const }),
-      "The Events API needs the app's signing secret, from Basic Information → App Credentials: slack.auth.withTokens({ token, signingSecret }).",
-    ],
-  ])("says what's missing, given %s", async (_, options, message) => {
-    await expect(start(options()).started).rejects.toThrow(message);
+  it("says a connection is needed when there is none", async () => {
+    const source = messages();
+    await expect(streamer(source).start()).rejects.toThrow(
+      "slack:messages reads connected Slack workspaces, so it needs a connection. Connect one with npx jev-events auth slack, or pass connections to start().",
+    );
     expect(slack.calls()).toEqual([]);
   });
 
-  it("fails to start when Slack refuses the token", async () => {
-    slack.revoke();
+  it("leaves new messages to the Events API when there's no app-level token", async () => {
+    const run = reading({ backfill: 5 }, connectionTo(slack, { appToken: false }));
+    slack.post({ channel: GENERAL, text: "old", live: false });
+    await run.start();
+    await waitFor(() => run.ended);
 
-    await expect(start().started).rejects.toThrow("Slack signed you out (token_revoked): the token was revoked or isn't valid. Connect again: npx jev-events auth slack");
+    expect(texts(run.items)).toEqual(["old"]);
+    expect(run.infos).toEqual(["slack: Acme has no app-level token, so its new messages come through the Events API at /webhook/slack."]);
+    expect(slack.calls("apps.connections.open")).toEqual([]);
   });
 
-  it("stops when Slack signs the app out", async () => {
+  it("takes the app-level token from slack.app() or SLACK_APP_TOKEN when the connection has none", async () => {
+    const connection = connectionTo(slack, { appToken: false });
+    const source = messages();
+    const viaApp = streamer(source, { connection, app: app({ appToken: "xapp-1-fake-app-token" }) });
+    await viaApp.start();
+    slack.post({ channel: GENERAL, text: "one" });
+    await waitFor(() => viaApp.items.length === 1);
+    viaApp.stop();
+    await waitFor(() => slack.sockets === 0);
+
+    vi.stubEnv("SLACK_APP_TOKEN", "xapp-1-fake-app-token");
+    const viaEnv = streamer(source, { connection });
+    await viaEnv.start();
+    slack.post({ channel: GENERAL, text: "two" });
+    await waitFor(() => viaEnv.items.length === 1);
+
+    expect(texts([...viaApp.items, ...viaEnv.items])).toEqual(["one", "two"]);
+    expect(slack.connections).toEqual(["open 1", "close 1", "open 2"]);
+  });
+
+  it("shares one Socket Mode connection between everything using the same app", async () => {
+    const needsAnswer = await watch();
+    const everything = await watch({ includeBots: true });
+    slack.post({ channel: GENERAL, text: "is prod down?" });
+    await waitFor(() => needsAnswer.items.length === 1 && everything.items.length === 1);
+
+    expect(slack.connections).toEqual(["open 1"]);
+    needsAnswer.stop();
+    slack.post({ channel: GENERAL, text: "hello?" });
+    await waitFor(() => everything.items.length === 2);
+    expect(slack.sockets).toBe(1);
+    everything.stop();
+    await waitFor(() => slack.sockets === 0);
+    expect(needsAnswer.items).toHaveLength(1);
+  });
+
+  it("hands events only to the workspace they're from", async () => {
+    const { items, warnings } = await watch();
+    slack.send({ type: "message", channel: "C0ELSEWHERE", channel_type: "channel", user: "U0SOMEONE", text: "not for Acme", ts: "1760000000.000100" }, { team: "T0OTHER" });
+    slack.post({ channel: GENERAL, text: "for Acme" });
+    await waitFor(() => items.length === 1);
+    await pause(30);
+
+    expect(texts(items)).toEqual(["for Acme"]);
+    expect(warnings).toEqual(["slack: events are coming in from workspace T0OTHER, which no monitor here reads. Connect it, or leave them be."]);
+  });
+
+  it("fails to start, needing a new sign-in, when Slack refuses the token", async () => {
+    slack.revoke();
+
+    const error = await reading().start().catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ message: "Slack signed this workspace out (token_revoked): the token was revoked or isn't valid.", needsSignIn: true });
+  });
+
+  it("stops, needing a new sign-in, when Slack signs the app out", async () => {
     const { items, errors, signal } = await watch();
     slack.revoke();
     slack.post({ channel: GENERAL, text: "anyone?" });
     await waitFor(() => errors.length === 1);
 
     expect(errors[0]?.fatal).toBe(true);
-    expect(String(errors[0]?.error)).toContain("Slack signed you out (token_revoked)");
+    expect(errors[0]?.error).toMatchObject({ message: "Slack signed this workspace out (token_revoked): the token was revoked or isn't valid.", needsSignIn: true });
     expect(signal.aborted).toBe(true);
     expect(items).toEqual([]);
   });
@@ -240,7 +310,7 @@ describe("slack.messages", () => {
 
     expect(texts(items)).toEqual(["old general"]);
     expect(warnings).toEqual([
-      "Couldn't read the latest messages in DM: Slack conversations.history failed: the app lacks the im:history scope. Add it under OAuth & Permissions → Scopes, reinstall the app, then run: npx jev-events auth slack",
+      "Couldn't read the latest messages in DM: Slack conversations.history failed: the app lacks the im:history scope. Add it under OAuth & Permissions → Scopes, then reinstall the app to the workspace.",
     ]);
     expect(errors).toEqual([]);
   });
