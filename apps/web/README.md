@@ -11,30 +11,24 @@ npm run dev -w @jev-events/web   # http://localhost:3000
 | `app/(home)` | The landing page |
 | `app/docs`, `content/docs` | The docs, written in MDX |
 | `app/og`, `lib/og.tsx` | Social preview images, rendered at build time |
-| `components/live-feed.tsx`, `components/relay` | The live feed and its connection to the [relay](../live-relay) |
-| `snippets` | Code examples for the site. They're type-checked, and `snippets/testing.ts` runs as a test |
-| `generated` | Data for the site: snippets, recipes, the relay's source, the dataset summary and benchmark results |
-| `public/replay.jsonl` | A recorded session, played when the relay is unavailable. [Record one](../live-relay#record-a-replay) |
+| `lib/builder`, `components/docs` | The builder on each integration's page and the prompt at the top of the docs. Both write a project's code from what the reader picks |
+| `lib/llms.ts` | `/llms.txt`, `/llms-full.txt` and each page as Markdown, for coding agents |
+| `snippets` | Code examples for the site. They're type-checked, and the `snippets/testing*.ts` examples run as tests |
+| `generated` | Data for the site: snippets, recipes, the dataset summary and benchmark results |
 
 ## Generated data
 
 Numbers and code on the site come from the repository, not from copies typed into pages.
 
 ```bash
-npm run site:data     # snippets, recipes, the relay's source and the dataset summary
+npm run site:data     # snippets, recipes and the dataset summary
 npm run eval:report   # benchmark results from evals/results
 ```
 
-Run them after changing a snippet, a recipe, the relay or the dataset. `npm test` fails when the
+Run them after changing a snippet, a recipe or the dataset. `npm test` fails when the
 generated files are stale.
-
-## Environment
-
-| Variable | |
-| --- | --- |
-| `NEXT_PUBLIC_RELAY_URL` | The live relay's public URL. Read at build time. Unset, the page plays its replay |
 
 ## Deploy on Vercel
 
 Import the repository and set the project's **Root Directory** to `apps/web`. Vercel detects Next.js and
-the npm workspace. Add `NEXT_PUBLIC_RELAY_URL` once the relay is running, then redeploy.
+the npm workspace.

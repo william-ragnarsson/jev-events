@@ -1,10 +1,10 @@
 ---
 title: CLI
-description: Watch Jev judge your inbox, calendar, Slack or any live stream in your terminal, and connect accounts.
+description: See what Jev says about your inbox, calendar, Slack or any live stream in your terminal, and sign in to your accounts.
 icon: SquareTerminal
 ---
 
-The `jev-events` command ships with the library, so `npx` runs it without installing anything. It needs your TypeSafe API key: put `TYPESAFE_API_KEY=<your key>` in a `.env` file, or paste the key when it asks and it's saved there for you.
+The `jev-events` command ships with the library, so `npx` runs it without installing anything first. It needs a TypeSafe API key: put `TYPESAFE_API_KEY=<your key>` in a `.env` file, or paste the key when it asks and it's saved there for you.
 
 ```bash
 npx jev-events watch bluesky
@@ -16,29 +16,38 @@ npx jev-events watch bluesky
 jev-events watch <source> [questions] [options]
 ```
 
-Prints one row per item with each answer, its probability and how long Jev took, then a summary of requests, tokens and estimated spend when you press Ctrl-C. Messages Jev finds likely hateful (p ≥ 0.8) are hidden in the table.
+It prints one row per item with each answer, its probability and how long Jev took. Stop it with Ctrl-C, and it prints how many requests it made, the tokens they used and the estimated spend. Text Jev finds likely hateful (p ≥ 0.8) is hidden in the table.
 
 ### Sources
 
-| Source | What it reads |
-| --- | --- |
-| `gmail` | New mail in your inbox, after `auth google` |
-| `calendar` or `calendar:<calendar id>` | New and changed events in your Google Calendar, after `auth google` |
-| `slack` or `slack:<channel>,<channel>` | Messages in the channels and DMs your Slack app is in, after `auth slack` |
-| `twitch:<channel>` | Any public Twitch chat, no login needed |
-| `bluesky` or `bluesky:<word>,<word>` | The Bluesky firehose, optionally only posts with these words |
-| `stdin` | One item per line, e.g. `tail -f app.log \| npx jev-events watch stdin -a "..."` |
-| `webhook` or `webhook:<port>` | POST `{"text": "..."}` to `http://127.0.0.1:8787/` |
+| Source | What it reads | Asks by default |
+| --- | --- | --- |
+| `gmail` | Your 5 latest emails, then new mail as it arrives | `email.needsReply`, `email.urgent`, `email.kind` |
+| `calendar` or `calendar:<calendar id>` | Your 5 next events, then new and changed ones | `calendar.important`, `calendar.needsPrep` |
+| `slack` or `slack:<channel>,<channel>` | Messages in the channels and DMs your Slack app is in | `team.needsAnswer`, `team.urgent`, `team.kind` |
+| `twitch` | Chat in your own channel, read as your account | `chat.kind`, `chat.hateful` |
+| `twitch:<channel>` | Any public Twitch chat, with no sign-in | `chat.kind`, `chat.hateful` |
+| `bluesky` or `bluesky:<word>,<word>` | New Bluesky posts, optionally only ones with these words | What each post is about |
+| `stdin` | One item per line, such as `tail -f app.log \| npx jev-events watch stdin -a "..."` | Nothing, so ask at least one question |
+| `webhook` or `webhook:<port>` | POSTs of `{"text": "..."}` to `http://127.0.0.1:8787/` | Nothing, so ask at least one question |
+
+The default questions are [recipes](/docs/recipes). `gmail`, `calendar`, `slack` and `twitch` read an account you signed in with [`auth`](#auth). They also need the integration installed in the folder you run the command from:
+
+```bash
+npm i jev-events @jev-events/google # for gmail and calendar
+npm i jev-events @jev-events/slack # for slack
+npm i jev-events @jev-events/twitch # for twitch
+```
 
 ### Questions
 
-Every source gets sensible default questions, except `stdin` and `webhook`, which need at least one.
+Questions you pass replace the defaults.
 
 | Flag | |
 | --- | --- |
-| `-a, --ask "label=Question?"` | A yes/no question. The label is optional. Repeat for more. |
+| `-a, --ask "label=Question?"` | A yes/no question. The label is optional. Repeat for more |
 | `-c, --choice "Question?" -o a,b,c` | Pick one of these labels |
-| `-r, --recipe email.urgent` | A built-in [recipe](/docs/recipes). Repeatable. |
+| `-r, --recipe email.urgent` | A built-in [recipe](/docs/recipes). Repeatable |
 
 ### Options
 
@@ -49,7 +58,7 @@ Every source gets sensible default questions, except `stdin` and `webhook`, whic
 | `--only` | | Only print items where something fired |
 | `--rate <n>` | 8 | Jev requests per second |
 | `--context <n>` | per source | Preceding items shown to Jev as context |
-| `--lang <codes>` | | Bluesky only: posts in these languages, e.g. `en` |
+| `--lang <codes>` | | Bluesky only: posts in these languages, such as `en` |
 | `-m, --model <id>` | `jev-latest` | The Jev model |
 | `--json` | | Print JSON lines instead of a table |
 
@@ -59,13 +68,16 @@ Every source gets sensible default questions, except `stdin` and `webhook`, whic
 # Does any of your mail need a reply, or is it urgent? (the default questions)
 npx jev-events watch gmail
 
-# Only the events that matter or need preparation
+# Only the events that matter or need preparing for
 npx jev-events watch calendar --only
 
 # One Slack channel
 npx jev-events watch slack:support
 
-# What is chat doing, and is any of it hateful?
+# Your own Twitch chat, as it happens
+npx jev-events watch twitch
+
+# Any live channel: what is chat doing, and is any of it hateful?
 npx jev-events watch twitch:<channel>
 
 # Your own question, only showing hits
@@ -90,14 +102,41 @@ npx jev-events watch bluesky:typescript --lang en --json \
 ```bash
 npx jev-events auth google
 npx jev-events auth slack
-npx jev-events auth twitch --client-id <id>
+npx jev-events auth twitch
 ```
 
-Connects an account once and saves it to `.jev-events/credentials.json`, which git ignores. The first time, `auth google` and `auth slack` walk you through creating your own Google OAuth client or Slack app, one step at a time. See [Google](/docs/integrations/google#sign-in), [Slack](/docs/integrations/slack#connect-a-workspace) and [Twitch](/docs/integrations/twitch#sign-in-a-bot).
+Signs in to an account once and saves it in `.jev-events/store.json`, in the folder you ran it from. The folder has its own `.gitignore`, so git leaves it out. `watch` reads the account from there, and so does a monitor you [start on your machine](/docs/quickstart).
+
+The first time, each one walks you through creating your own app on the platform, one step at a time:
+
+- `auth google` asks for a Google OAuth client, then opens Google in your browser to approve access to Gmail and Calendar. See [Gmail](/docs/integrations/gmail#try-it-without-code).
+- `auth slack` prints a link that creates the Slack app with everything filled in, then asks for its two tokens. See [Slack](/docs/integrations/slack#try-it-without-code).
+- `auth twitch` asks for a Twitch app's Client ID, then shows a code to approve on Twitch. See [Twitch](/docs/integrations/twitch#try-it-without-code).
+
+`auth google` and `auth twitch` remember your app, so signing in to another account later skips the setup. Signing in to the same account again replaces its saved sign-in.
 
 | Flag | |
 | --- | --- |
-| `--client-id <id> --client-secret <secret>` | Google: use this OAuth client instead of asking |
+| `--client-id <id> --client-secret <secret>` | Google: use this OAuth client instead of asking. Defaults to `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` |
 | `--token <xoxb-…> --app-token <xapp-…>` | Slack: use these tokens instead of asking |
-| `--client-id <id>` | Twitch: your Twitch app, required |
-| `--scopes "<scope> <scope>"` | Google and Twitch: ask for fewer permissions |
+| `--client-id <id>` | Twitch: use this app instead of asking. Defaults to `TWITCH_CLIENT_ID` |
+| `--client-secret <secret>` | Twitch: only for an app registered as Confidential |
+| `--scopes "<scope> <scope>"` | Google and Twitch: ask for fewer permissions. For Google, `gmail`, `calendar` or scope URLs |
+
+### Accounts from the environment
+
+On a server or in CI, where no one can approve a sign-in, `watch` also reads one account from environment variables. When they're set, it uses them instead of `.jev-events/`:
+
+| Integration | Variables |
+| --- | --- |
+| Google | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REFRESH_TOKEN` |
+| Slack | `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN` |
+| Twitch | `TWITCH_CLIENT_ID` and `TWITCH_ACCESS_TOKEN`, plus `TWITCH_REFRESH_TOKEN` to renew it |
+
+## `key`
+
+```bash
+npx jev-events key
+```
+
+Prints a new random `JEV_EVENTS_KEY`. `postgresStore()` uses it to encrypt the tokens it keeps for your users, so set it once where your app runs and keep it as safe as the database. See [the store](/docs/your-users#the-store).

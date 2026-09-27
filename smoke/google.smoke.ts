@@ -1,88 +1,76 @@
 import { randomUUID } from "node:crypto";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { listen, noul, readCredentials, silentLogger, type AnySource, type Item, type Listener, type TriggeredEvent } from "jev-events";
+import { fileStore, memoryStore, monitor, noul, silentLogger, type Connection, type Item, type Source, type Store } from "jev-events";
 import { mockJev } from "jev-events/testing";
 
-import { events, fromEnv, fromFile, GoogleApi, inbox, trash, type CalendarItem, type GmailItem, type GoogleAuth } from "@jev-events/google";
+import { events, fromEnv, GoogleApi, inbox, trash, withTokens, type CalendarItem, type GmailItem, type GoogleTokens } from "@jev-events/google";
 
-import { waitFor } from "./helpers.js";
-
-// Gmail and Google Calendar against your real account. Reading runs whenever you've signed in;
-// the checks that add and remove things run only with SMOKE_GOOGLE_WRITE=1. See smoke/README.md.
-
-const signedIn = Boolean(process.env.GOOGLE_REFRESH_TOKEN || readCredentials("google"));
-const write = process.env.SMOKE_GOOGLE_WRITE === "1";
+// Gmail and Google Calendar against your real account, with Jev mocked. Reading runs whenever
+// you've signed in; the checks that add and remove things run only with SMOKE_GOOGLE_WRITE=1.
+// See smoke/README.md.
 
 /** GOOGLE_CLIENT_ID and GOOGLE_REFRESH_TOKEN when set, otherwise what `npx jev-events auth google` saved. */
-const signIn = (): GoogleAuth => (process.env.GOOGLE_REFRESH_TOKEN ? fromEnv() : fromFile());
+const account: Connection | undefined = process.env.GOOGLE_REFRESH_TOKEN
+  ? fromEnv()
+  : (await fileStore().connections.list({ integration: "google" })).find((connection) => connection.status === "active");
+const write = process.env.SMOKE_GOOGLE_WRITE === "1";
 
-let running: Array<Listener<AnySource, Record<string, ReturnType<typeof noul>>>> = [];
+const smokeTest = noul("Smoke test");
 
-afterEach(async () => {
-  await Promise.all(running.map((listener) => listener.stop()));
-  running = [];
-});
-
-/** Start `source` with Jev mocked, and collect what it emits. */
-async function watch<I extends Item>(source: AnySource): Promise<I[]> {
+/** One check of `source` on your account, as a cron job would run it. Returns what it judged. */
+async function check<I extends Item, P extends string, S>(source: Source<I, P, S>, store: Store): Promise<I[]> {
   const items: I[] = [];
-  const listener = listen(source, { check: noul("Smoke test") }, { client: mockJev(() => ({ check: 0 })), log: silentLogger }).on("judged", (event) => {
-    items.push(event.item as I);
-  });
-  running.push(listener);
-  await listener.start();
+  await monitor({ source, questions: { smokeTest }, client: mockJev(() => ({ smokeTest: 0 })), log: silentLogger })
+    .on("judged", (event) => void items.push(event.item))
+    .run({ store, connections: [account!] });
   return items;
 }
 
-function firedOn<I extends Item>(item: I): TriggeredEvent<I> {
-  return {
-    item,
-    answers: {},
-    model: "smoke",
-    latencyMs: 0,
-    usage: { inputTokens: 0, outputTokens: 0 },
-    cached: false,
-    dryRun: false,
-    protected: false,
-    trigger: { event: "smoke", question: "smoke" },
-  };
+/** Check again every few seconds until `found` says so, the way scheduled checks would. */
+async function checkUntil(found: () => Promise<boolean>, ms: number, what: string): Promise<void> {
+  const start = Date.now();
+  while (!(await found())) {
+    if (Date.now() - start > ms) throw new Error(`Waited ${Math.round(ms / 1000)}s for ${what}.`);
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+  }
 }
 
-describe.skipIf(!signedIn)("google, signed in (real Gmail and Calendar)", () => {
-  it("reads your latest emails", async () => {
-    const emails = await watch<GmailItem>(inbox({ auth: signIn(), backfill: 3, every: "1h" }));
+/** The Google API as your account, to add and inspect test data outside the monitor. */
+const api = () => new GoogleApi(withTokens(account!.credentials as unknown as GoogleTokens));
 
-    await waitFor(() => emails.length > 0, 30_000, "an email from your inbox (is it empty?)");
+describe.skipIf(!account)("google, signed in (real Gmail and Calendar)", () => {
+  it("reads your latest emails", async () => {
+    const emails = await check(inbox({ backfill: 3 }), memoryStore());
+
+    expect(emails.length, "an email from your inbox (is it empty?)").toBeGreaterThan(0);
     for (const email of emails) {
       expect(email.labels).toContain("INBOX");
       expect(email.author.email).toContain("@");
       expect(email.text.length).toBeGreaterThan(0);
       expect(Number.isNaN(email.at.getTime())).toBe(false);
     }
-  });
+  }, 60_000);
 
   it("reads your calendar", async () => {
-    // Starting proves the sign-in, the Calendar permission and the sync; upcoming events are a bonus.
-    const upcoming = await watch<CalendarItem>(events({ auth: signIn(), backfill: 3, every: "1h" }));
+    // Checking proves the sign-in, the Calendar permission and the sync; upcoming events are a bonus.
+    const upcoming = await check(events({ backfill: 3 }), memoryStore());
 
-    await new Promise((resolve) => setTimeout(resolve, 5_000));
     for (const event of upcoming) {
       expect(event.change).toBe("existing");
       expect(event.end.getTime()).toBeGreaterThanOrEqual(event.start.getTime());
       expect(event.end.getTime()).toBeGreaterThan(Date.now());
     }
-  });
+  }, 60_000);
 
   it.skipIf(!write)("sees a new email arrive, then moves it to Trash", async () => {
-    const auth = signIn();
-    const source = inbox({ auth, every: "3s" });
-    const emails = await watch<GmailItem>(source);
+    const store = memoryStore();
+    await check(inbox(), store); // new mail counts from here
     const subject = `jev-events smoke test ${randomUUID().slice(0, 8)}`;
     const mime = [
       "From: jev-events smoke test <smoke@jev-events.invalid>",
-      `To: ${auth.email ?? "me"}`,
+      `To: ${String(account!.facts?.email ?? "me")}`,
       `Subject: ${subject}`,
       `Date: ${new Date().toUTCString()}`,
       'Content-Type: text/plain; charset="UTF-8"',
@@ -91,22 +79,36 @@ describe.skipIf(!signedIn)("google, signed in (real Gmail and Calendar)", () => 
     ].join("\r\n");
 
     // Put it straight in the inbox, the way mail arrives, without sending anything.
-    await new GoogleApi(auth).gmail("POST", "/messages", { body: { raw: Buffer.from(mime).toString("base64url"), labelIds: ["INBOX", "UNREAD"] } });
-    await waitFor(() => emails.some((email) => email.subject === subject), 60_000, `"${subject}" to arrive`);
-    const email = emails.find((e) => e.subject === subject)!;
-    await trash().run(firedOn(email), source);
+    await api().gmail("POST", "/messages", { body: { raw: Buffer.from(mime).toString("base64url"), labelIds: ["INBOX", "UNREAD"] } });
+    const trashed: string[] = [];
+    await checkUntil(
+      async () => {
+        await monitor({
+          source: inbox(),
+          questions: { smokeTest },
+          client: mockJev(({ state }) => ({ smokeTest: JSON.stringify(state).includes(subject) ? 1 : 0 })),
+          dryRun: false,
+          log: silentLogger,
+        })
+          .on("smokeTest", trash())
+          .on("action", (event) => void (event.status === "done" && trashed.push(event.event.item.id)))
+          .run({ store, connections: [account!] });
+        return trashed.length > 0;
+      },
+      60_000,
+      `"${subject}" to arrive`,
+    );
 
-    const after = await new GoogleApi(auth).gmail<{ labelIds: string[] }>("GET", `/messages/${email.id}`, { query: { format: "minimal" } });
+    const after = await api().gmail<{ labelIds: string[] }>("GET", `/messages/${trashed[0]}`, { query: { format: "minimal" } });
     expect(after.labelIds).toContain("TRASH");
-  });
+  }, 90_000);
 
   it.skipIf(!write)("sees a new calendar event, then removes it", async () => {
-    const auth = signIn();
-    const api = new GoogleApi(auth);
-    const upcoming = await watch<CalendarItem>(events({ auth, every: "3s" }));
+    const store = memoryStore();
+    await check(events(), store); // changes count from here
     const title = `jev-events smoke test ${randomUUID().slice(0, 8)}`;
     const start = new Date(Date.now() + 86_400_000);
-    const created = await api.calendar<{ id: string }>("POST", "/calendars/primary/events", {
+    const created = await api().calendar<{ id: string }>("POST", "/calendars/primary/events", {
       body: {
         summary: title,
         description: "The jev-events smoke test made this and removes it itself.",
@@ -116,12 +118,20 @@ describe.skipIf(!signedIn)("google, signed in (real Gmail and Calendar)", () => 
     });
 
     try {
-      await waitFor(() => upcoming.some((event) => event.title === title), 60_000, `"${title}" to show up`);
-      const event = upcoming.find((e) => e.title === title)!;
-      expect(event.change).toBe("new");
-      expect(event.organizer.you).toBe(true);
+      let seen: CalendarItem | undefined;
+      await checkUntil(
+        async () => {
+          seen = (await check(events(), store)).find((event) => event.title === title);
+          return seen !== undefined;
+        },
+        60_000,
+        `"${title}" to show up`,
+      );
+      expect(seen?.change).toBe("new");
+      expect(seen?.organizer.you).toBe(true);
     } finally {
-      await api.calendar("DELETE", `/calendars/primary/events/${created.id}`);
+      // The test's own event, not yours, so it's removed rather than left in the trash.
+      await api().calendar("DELETE", `/calendars/primary/events/${created.id}`);
     }
-  });
+  }, 90_000);
 });

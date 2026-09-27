@@ -1,35 +1,38 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { authorize, MANIFEST, SETUP_STEPS, type AuthorizeOptions, type SlackTokens } from "@jev-events/slack";
-import { readCredentials } from "jev-events";
+import { authorize, manifestUrl, SETUP_STEPS, type AuthorizeOptions } from "@jev-events/slack";
+import { fileStore, memoryStore } from "jev-events";
 
-import { APP_TOKEN, BOT_TOKEN, fakeSlack, GENERAL, RANDOM, type FakeSlack } from "./fake-slack.js";
+import { APP_TOKEN, BOT, BOT_TOKEN, fakeSlack, GENERAL, RANDOM, TEAM, type FakeSlack } from "./fake-slack.js";
 
 let slack: FakeSlack;
 let dir: string;
-let path: string;
 let lines: string[];
 
 beforeEach(async () => {
   slack = await fakeSlack();
-  dir = mkdtempSync(join(tmpdir(), "jev-slack-authorize-"));
-  path = join(dir, "credentials.json");
+  dir = join(mkdtempSync(join(tmpdir(), "jev-slack-authorize-")), ".jev-events");
+  vi.stubEnv("JEV_EVENTS_KEY", undefined);
   lines = [];
 });
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
+  await fileStore(dir).close?.();
   await slack.close();
-  rmSync(dir, { recursive: true, force: true });
+  rmSync(join(dir, ".."), { recursive: true, force: true });
 });
 
-const connect = (options: AuthorizeOptions = {}) => authorize({ path, env: {}, print: (line) => void lines.push(line), ...options });
+const file = "store.json";
+const connect = (options: AuthorizeOptions = {}) => authorize({ dir, env: {}, print: (line) => void lines.push(line), ...options });
 const withBoth: AuthorizeOptions = { token: BOT_TOKEN, "app-token": APP_TOKEN };
 const steps = SETUP_STEPS.map((step, index) => `  ${index + 1}. ${step}`);
-const saved = () => readCredentials<SlackTokens>("slack", path);
+/** The Slack connections saved in the file store. */
+const connections = () => fileStore(dir).connections.list({ integration: "slack" });
 
 /** Run with stdin not a terminal, as when piped, so authorize can't ask. */
 async function withoutTerminal<T>(run: () => Promise<T>): Promise<T> {
@@ -44,24 +47,52 @@ async function withoutTerminal<T>(run: () => Promise<T>): Promise<T> {
 }
 
 describe("authorize", () => {
-  it("checks both tokens, saves them and says where the app is", async () => {
+  it("checks both tokens, saves the connection in .jev-events/store.json and says where the app is", async () => {
     const workspace = await connect(withBoth);
 
-    expect(workspace).toEqual({ team: "Acme", teamId: "T0ACME", user: "jev_events", conversations: ["#general", "#random"] });
-    expect(saved()).toEqual({ token: BOT_TOKEN, appToken: APP_TOKEN, team: "Acme", teamId: "T0ACME", userId: "U0BOT", user: "jev_events" });
+    expect(workspace).toEqual({
+      team: "Acme",
+      teamId: TEAM.id,
+      user: BOT.handle,
+      conversations: ["#general", "#random"],
+      connection: expect.objectContaining({ id: "slack:T0ACME", integration: "slack", label: "Acme", status: "active" }),
+    });
+    expect(workspace.connection).not.toHaveProperty("credentials");
+    // On disk right away, so `jev-events watch slack` in another terminal finds it.
+    const saved = JSON.parse(readFileSync(join(dir, file), "utf8")) as { connections: Record<string, { credentials: unknown; facts: unknown }> };
+    expect(saved.connections["slack:T0ACME"]).toMatchObject({
+      credentials: { token: BOT_TOKEN, appToken: APP_TOKEN },
+      facts: { team: "Acme", teamId: TEAM.id, userId: BOT.userId, user: BOT.handle, url: TEAM.url, botId: BOT.botId },
+    });
     expect(lines).toEqual([
       "",
-      `  Connected to Acme as @jev_events. Saved to ${path}.`,
+      `  Connected to Acme as @jev_events. Saved to ${join(dir, file)}.`,
       "  It's in #general, #random.",
       "",
       "  Try it:  npx jev-events watch slack",
     ]);
   });
 
+  it("saves into the store you pass instead", async () => {
+    const store = memoryStore();
+    await connect({ ...withBoth, store });
+
+    expect((await store.connections.list()).map((connection) => connection.id)).toEqual(["slack:T0ACME"]);
+    expect(await connections()).toEqual([]);
+    expect(lines[1]).toBe("  Connected to Acme as @jev_events.");
+  });
+
+  it("replaces the connection when the same workspace connects again", async () => {
+    await connect(withBoth);
+    await connect(withBoth);
+
+    expect((await connections()).map((connection) => connection.id)).toEqual(["slack:T0ACME"]);
+  });
+
   it("takes the tokens from SLACK_BOT_TOKEN and SLACK_APP_TOKEN", async () => {
     await connect({ env: { SLACK_BOT_TOKEN: BOT_TOKEN, SLACK_APP_TOKEN: APP_TOKEN } });
 
-    expect(saved()).toMatchObject({ token: BOT_TOKEN, appToken: APP_TOKEN });
+    expect((await connections())[0]?.credentials).toEqual({ token: BOT_TOKEN, appToken: APP_TOKEN });
   });
 
   it("walks you through making the app, then asks for the two tokens", async () => {
@@ -71,7 +102,7 @@ describe("authorize", () => {
 
     expect(lines.slice(0, 8)).toEqual(["", "  Slack needs an app of your own. One-time setup, about 2 minutes:", "", ...steps, ""]);
     expect(asked).toEqual(["  Bot User OAuth Token (xoxb-…): ", "  App-level token (xapp-…): "]);
-    expect(saved()).toMatchObject({ token: BOT_TOKEN, appToken: APP_TOKEN });
+    expect((await connections())[0]?.credentials).toEqual({ token: BOT_TOKEN, appToken: APP_TOKEN });
   });
 
   it("asks only for the token it doesn't have", async () => {
@@ -88,7 +119,11 @@ describe("authorize", () => {
       `Slack needs an app of your own first (one-time, about 2 minutes):\n\n${steps.join("\n")}\n\n  Then run: npx jev-events auth slack --token <xoxb-…> --app-token <xapp-…>`,
     );
     expect(slack.calls()).toEqual([]);
-    expect(existsSync(path)).toBe(false);
+    expect(existsSync(join(dir, file))).toBe(false);
+  });
+
+  it("starts the steps with a link that creates the app with everything filled in", () => {
+    expect(SETUP_STEPS[0]).toContain(manifestUrl());
   });
 
   it("says when the tokens are swapped", async () => {
@@ -122,7 +157,7 @@ describe("authorize", () => {
 
     expect((error as Error).message).toBe(message);
     expect((error as Error).message).not.toMatch(/xox|xapp-1/);
-    expect(existsSync(path)).toBe(false);
+    expect(existsSync(join(dir, file))).toBe(false);
   });
 
   it("says how to add the app to a channel when it's in none", async () => {
@@ -133,7 +168,7 @@ describe("authorize", () => {
     expect(workspace.conversations).toEqual([]);
     expect(lines).toEqual([
       "",
-      `  Connected to Acme as @jev_events. Saved to ${path}.`,
+      `  Connected to Acme as @jev_events. Saved to ${join(dir, file)}.`,
       "  It isn't in any channel yet. In Slack, open a channel and type: /invite @jev_events",
       "  (or send it a direct message).",
       "",
@@ -146,36 +181,5 @@ describe("authorize", () => {
     await connect(withBoth);
 
     expect(lines[2]).toBe("  It's in #general, #random, #design, #eng, #sales and 2 more.");
-  });
-});
-
-describe("MANIFEST", () => {
-  it("asks for what the source and the actions use, with Socket Mode on", () => {
-    expect([...MANIFEST.oauth_config.scopes.bot].sort()).toEqual(
-      [
-        "channels:history",
-        "channels:read",
-        "chat:write",
-        "groups:history",
-        "groups:read",
-        "im:history",
-        "im:read",
-        "mpim:history",
-        "mpim:read",
-        "reactions:write",
-        "users:read",
-      ].sort(),
-    );
-    expect(MANIFEST.settings.event_subscriptions.bot_events).toEqual(["message.channels", "message.groups", "message.im", "message.mpim"]);
-    expect(MANIFEST.settings.socket_mode_enabled).toBe(true);
-  });
-
-  it("is what the first step's link fills in", () => {
-    const step = SETUP_STEPS[0] ?? "";
-    const link = new URL(step.slice(step.indexOf("https://")));
-
-    expect(`${link.origin}${link.pathname}`).toBe("https://api.slack.com/apps");
-    expect(link.searchParams.get("new_app")).toBe("1");
-    expect(JSON.parse(link.searchParams.get("manifest_json") ?? "null")).toEqual(MANIFEST);
   });
 });

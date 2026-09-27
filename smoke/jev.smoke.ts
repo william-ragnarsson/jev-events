@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { choice, from, listen, noul, silentLogger } from "jev-events";
+import { choice, from, monitor, noul, silentLogger } from "jev-events";
 
 // Real Jev. Skipped unless TYPESAFE_API_KEY is set, and when TYPESAFE_BASE_URL points at a local
 // stand-in such as `npm run mock-jev`. Makes three requests.
@@ -18,15 +18,15 @@ describe.skipIf(!live)("Jev (real API)", () => {
   it("answers yes-or-no and choice questions sensibly", async () => {
     const answers = new Map<string, { rude: number; kind: string }>();
     let model = "";
-    const stats = await listen(
-      from([
+    const stats = await monitor({
+      source: from([
         { id: "insult", text: "you are a worthless idiot, nobody wants you here" },
         { id: "praise", text: "thanks for the stream, that was so much fun!" },
         { id: "question", text: "what game is this?" },
       ]),
       questions,
-      { log: silentLogger },
-    )
+      log: silentLogger,
+    })
       .on("judged", (event) => {
         model = event.model;
         answers.set(event.item.id, { rude: event.answers.rude.noul, kind: event.answers.kind.choice });

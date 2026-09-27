@@ -1,14 +1,14 @@
 ---
 title: Testing
-description: Test your listeners without network calls or an API key, using a fake Jev client.
+description: Test your monitors without network calls or an API key, using a fake Jev client.
 icon: FlaskConical
 ---
 
-`jev-events/testing` exports `mockJev()`, a fake client that answers from a function you write. Pass it as `client`, feed items with `from()`, and `run()` judges them all and returns the stats.
+`jev-events/testing` exports `mockJev()`, a fake client that answers from a function you write. Pass it to `monitor()` as `client`, feed items with [`from()`](/docs/concepts/sources#from), and `run()` judges them all and returns the stats. Nothing reaches TypeSafe, so tests need no key and cost nothing.
 
 <Snippet name="testing" title="outage.test.ts" />
 
-This example runs in the project's own test suite, so it keeps working as the library changes.
+The examples on this page run in the project's own test suite, so they keep working as the library changes.
 
 ## Answers
 
@@ -23,6 +23,14 @@ This example runs in the project's own test suite, so it keeps working as the li
 
 Any full SDK response works too. A missing answer, or a label the question doesn't have, throws, so typos in tests fail loudly.
 
+## Actions
+
+Monitors start in dry-run, so a test can check what an action would do without it running. Each action reports an `action` event with its `status`: `dry-run`, `done`, `skipped` with a `reason`, or `failed`. `stats.actions` counts them.
+
+<Snippet name="testing-actions" title="refunds.test.ts" />
+
+Built-in actions behave the same, but they need their platform's source, so test those in dry-run against your own account: run the monitor with `npx tsx`, and read the `[dry-run] would …` lines or the [audit log](/docs/concepts/safety#audit-log).
+
 ## Options
 
 ```ts
@@ -33,4 +41,4 @@ mockJev(respond, { latencyMs: 120, inputTokens: 150, model: "jev-mock" });
 
 ## Inspect requests
 
-`jev.calls` records every request in order, so you can check exactly what Jev was shown, as the last line of the example does. It's the quickest way to debug a question that answers differently than you expected.
+`jev.calls` records every request in order, so you can check exactly what Jev was shown, as the last line of the first example does. It's the quickest way to debug a question that answers differently than you expected.

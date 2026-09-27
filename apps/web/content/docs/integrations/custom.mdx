@@ -1,36 +1,94 @@
 ---
 title: Anything else
-description: Logs, queues, support tickets, webhooks and public firehoses. If it produces text, it's a stream.
+description: Logs, queues, support tickets, webhooks and public firehoses. If it produces text, you can monitor it.
 icon: Webhook
 ---
 
-Jev Events isn't limited to its connectors. Anything that produces text over time can be a source, and your own functions handle the events.
+Jev Events isn't limited to its integrations. Anything that produces text over time can be a source, and your own functions handle what fires.
 
-<Snippet name="custom" title="any-stream.ts" />
+<Snippet name="custom" title="monitor.ts" />
 
 ## Ideas
 
 | Stream | Source | A question to ask |
 | --- | --- | --- |
-| Application logs | `from(readline)` or `stdin` in the CLI | Does this line describe a failure a human should look at? |
+| Application logs | `from(lines)`, or `stdin` in the CLI | Does this line describe a failure a human should look at? |
 | Support tickets | `webhook({ map })` from your help desk | Is the customer angry? Is this a bug report? |
 | Product reviews | `from(rows)` over a database cursor | Does this review mention a specific missing feature? |
 | Contact forms | `webhook({ map })` from your backend | Is this a sales lead, a support request or spam? |
 | Bluesky | `bluesky({ keywords })` from `jev-events/public` | Is this post about our product, and is it a complaint? |
 
-## Public streams
+## Try it without code
 
-`jev-events/public` has read-only sources that need no login. They're built for demos, the CLI and trying questions on real traffic.
+Pipe any text into the CLI, one item per line, and ask your own question:
 
-```ts
-import { listen, noul } from "jev-events";
-import { bluesky } from "jev-events/public";
-
-const posts = listen(bluesky({ keywords: ["typescript"], langs: ["en"] }), {
-  question: noul("Is this post asking for help with a TypeScript problem?"),
-});
+```bash
+tail -f app.log | npx jev-events watch stdin -a "outage=Does this line describe a failure a human should look at?"
 ```
 
-## Build a connector
+Or start a webhook and POST `{ "text": "…" }` to `http://127.0.0.1:8787/`:
 
-The [sources guide](/docs/concepts/sources#write-your-own) shows a complete source in about 30 lines, and `defineAction()` turns a platform API call into a [native action](/docs/concepts/actions#your-own-actions) with dry-run and protected users built in. Outlook, YouTube, Discord and more are on the [roadmap](/docs/roadmap).
+```bash
+npx jev-events watch webhook -a "angry=Is the customer angry?"
+```
+
+See [the CLI](/docs/cli) for every source and flag.
+
+## From your own code
+
+`from(values)` reads any iterable or async iterable: an array, a generator, a readline interface, a database cursor. The source ends when the iterable does, so `await logs.run()` judges everything, then returns counts of what was judged, dropped and done.
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `map` | Strings and `{ text }` as they are | Turns each value into an item. Return `null` to skip it |
+| `noun` | `"item"` | What one item is called, so Jev reads "this line" or "this ticket" |
+| `recent` | `0` | Preceding items to show Jev as context |
+| `id` | `"custom:from"` | The source's id, which is also the monitor's unless you give it one |
+
+An item is a string, or an object with `text` and any of `id`, `author`, `at`, `facts` and `raw`. Missing ids and timestamps are filled in.
+
+## Over HTTP
+
+`webhook()` turns anything that can send a webhook into a source. Started on its own, it listens on its own port. Passed to [`runtime()`](/docs/your-users) in a web app, it answers POSTs to `/api/jev/webhook/<monitor id>` instead.
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `map` | A string, `{ text }` or an array of them | Turns a request body into items. JSON bodies are parsed |
+| `secret` | None | Requires `Authorization: Bearer <secret>` |
+| `port`, `host`, `path` | `8787`, `"127.0.0.1"`, `"/"` | Where it listens when started on its own. Use `"0.0.0.0"` to accept other machines |
+| `maxBytes` | 1 MB | The largest body it accepts |
+| `id` | `"webhook"` | The source's id, which is also the monitor's unless you give it one |
+
+```ts title="tickets.ts"
+import { monitor, noul, webhook } from "jev-events";
+
+const tickets = monitor({
+  source: webhook<{ ticket: { id: string; body: string; requester: string } }>({
+    secret: process.env.WEBHOOK_SECRET,
+    map: ({ ticket }) => ({ id: ticket.id, text: ticket.body, author: ticket.requester }),
+  }),
+  questions: { angry: noul("Is the customer angry?") },
+}).on("angry", { min: 0.7 }, (e) => console.log(`Ticket ${e.item.id} needs a person`));
+
+await tickets.start();
+```
+
+## Public streams
+
+`jev-events/public` has read-only sources that need no sign-in, for demos, the CLI and trying questions on real traffic: `twitchChat(channel)` reads any public Twitch chat, and `bluesky({ keywords, langs })` reads new Bluesky posts.
+
+```ts title="posts.ts"
+import { monitor, noul } from "jev-events";
+import { bluesky } from "jev-events/public";
+
+const posts = monitor({
+  source: bluesky({ keywords: ["typescript"], langs: ["en"] }),
+  questions: { help: noul("Is this post asking for help with a TypeScript problem?") },
+}).on("help", (e) => console.log(e.item.text));
+
+await posts.start();
+```
+
+## Build an integration
+
+The [sources guide](/docs/concepts/sources#write-your-own) shows how a source checks, streams or receives webhooks, and `defineAction()` turns a platform API call into a [native action](/docs/concepts/actions#your-own-actions) with dry-run and protected users built in. Outlook, Teams, Discord, GitHub and more are on the [roadmap](/docs/roadmap).

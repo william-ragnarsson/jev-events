@@ -5,7 +5,7 @@
   "type": "module",
   "license": "MIT",
   "author": "William Ragnarsson",
-  "homepage": "https://jevevents.dev/docs/integrations/google",
+  "homepage": "https://jevevents.dev/docs/integrations/gmail",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/william-popmie/jev-events.git",

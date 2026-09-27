@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 
 import { TypeSafeError } from "@typesafe-ai/sdk";
 
+import { generateKey } from "../store/seal.js";
 import { KEY_URL, loadEnv, readSecret } from "./env.js";
 import { forThisShell, paint } from "./format.js";
 import { UsageError, watch, type WatchFlags } from "./watch.js";
@@ -12,13 +13,18 @@ const HELP = `${paint(["bold", "magenta"], "jev-events")}: watch a stream, ask J
 
 ${paint("bold", "Usage")}
   jev-events watch <source> [questions] [options]
-  jev-events auth <google|slack|twitch>      connect an account once; saved in .jev-events/
+  jev-events auth <google|microsoft|slack|twitch> connect an account once; saved in .jev-events/
+  jev-events key                             a new JEV_EVENTS_KEY, to encrypt the tokens a store saves
 
 ${paint("bold", "Sources")}
   gmail                    new mail in your inbox (after: jev-events auth google)
   calendar                 new and changed events in your Google Calendar (after: jev-events auth google)
   slack[:channel]          messages in channels the Slack app is in (after: jev-events auth slack)
-  twitch:<channel>         any public Twitch chat, no login needed
+  twitch                   chat in your own Twitch channel, as your account (after: jev-events auth twitch)
+  twitch:<channel>         any public Twitch chat, no sign-in needed
+  outlook                  new mail in your Outlook inbox (after: jev-events auth microsoft)
+  outlook-calendar         new and changed events in your Outlook Calendar (after: jev-events auth microsoft)
+  teams                    Teams chat messages, work or school accounts only (after: jev-events auth microsoft)
   bluesky[:word,word]      the Bluesky firehose, optionally only posts with these words
   stdin                    one item per line: tail -f app.log | jev-events watch stdin -a "..."
   webhook[:port]           POST {"text": "..."} to http://127.0.0.1:8787/
@@ -63,6 +69,7 @@ async function main(argv: string[]): Promise<void> {
       model: { type: "string", short: "m" },
       json: { type: "boolean" },
       "client-id": { type: "string" },
+      tenant: { type: "string" },
       "client-secret": { type: "string" },
       scopes: { type: "string" },
       token: { type: "string" },
@@ -88,13 +95,16 @@ async function main(argv: string[]): Promise<void> {
       return watch(target, values as WatchFlags);
     case "auth":
       return auth(target, values);
+    case "key":
+      process.stdout.write(`${generateKey()}\n`);
+      return;
     default:
       throw new UsageError(`Unknown command "${command}". Run jev-events --help.`);
   }
 }
 
 async function auth(platform: string | undefined, values: Record<string, unknown>): Promise<void> {
-  const packages: Record<string, string> = { google: "@jev-events/google", slack: "@jev-events/slack", twitch: "@jev-events/twitch" };
+  const packages: Record<string, string> = { google: "@jev-events/google", microsoft: "@jev-events/microsoft", slack: "@jev-events/slack", twitch: "@jev-events/twitch" };
   const name = packages[platform ?? ""];
   if (!name) throw new UsageError(`Usage: jev-events auth <${Object.keys(packages).join("|")}>`);
   let mod: { authorize?: (options: Record<string, unknown>) => Promise<unknown> };

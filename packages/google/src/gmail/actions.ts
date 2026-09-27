@@ -1,41 +1,41 @@
-import { defineAction, type TriggeredEvent } from "jev-events";
+import { defineAction, type ActionContext, type TriggeredEvent } from "jev-events";
 
 import { GoogleApiError, type GoogleApi } from "../api.js";
 import type { GmailItem } from "./item.js";
 import type { EmailAddress } from "./message.js";
-import type { GmailSession, GmailSource } from "./source.js";
+import type { GmailSession } from "./source.js";
 
 type Event = TriggeredEvent<GmailItem>;
 type Text = string | ((event: Event) => string);
 
 const resolve = (text: Text, event: Event) => (typeof text === "function" ? text(event) : text);
 
-function sessionOf(source: GmailSource): GmailSession {
-  if (!source.session) throw new Error("Gmail actions need the Gmail source: google.gmail.inbox({ auth }).");
-  return source.session;
+function sessionOf(ctx: ActionContext<GmailSession>): GmailSession {
+  if (!ctx.session?.api) throw new Error("Gmail actions run on items from google.gmail.inbox().");
+  return ctx.session;
 }
 
 const sender = (e: Event) => e.item.from.name ?? e.item.from.address;
 
 function modify(name: string, describe: (e: Event) => string, change: { addLabelIds?: string[]; removeLabelIds?: string[] }) {
-  return defineAction<"gmail", GmailItem, GmailSource>({
+  return defineAction<"gmail", GmailItem, GmailSession>({
     platform: "gmail",
     name,
     describe,
-    async run(e, source) {
-      await sessionOf(source).api.gmail("POST", `/messages/${e.item.id}/modify`, { body: change });
+    async run(e, ctx) {
+      await sessionOf(ctx).api.gmail("POST", `/messages/${e.item.id}/modify`, { body: change });
     },
   });
 }
 
 /** Move the email to Trash. Gmail keeps it there for 30 days; nothing is deleted permanently. */
 export function trash() {
-  return defineAction<"gmail", GmailItem, GmailSource>({
+  return defineAction<"gmail", GmailItem, GmailSession>({
     platform: "gmail",
     name: "gmail.trash",
     describe: (e) => `move the email from ${sender(e)} to Trash`,
-    async run(e, source) {
-      await sessionOf(source).api.gmail("POST", `/messages/${e.item.id}/trash`);
+    async run(e, ctx) {
+      await sessionOf(ctx).api.gmail("POST", `/messages/${e.item.id}/trash`);
     },
   });
 }
@@ -55,12 +55,12 @@ export function star() {
 
 /** Add a label, creating it the first time. */
 export function label(name: string) {
-  return defineAction<"gmail", GmailItem, GmailSource>({
+  return defineAction<"gmail", GmailItem, GmailSession>({
     platform: "gmail",
     name: "gmail.label",
     describe: (e) => `label the email from ${sender(e)} "${name}"`,
-    async run(e, source) {
-      const session = sessionOf(source);
+    async run(e, ctx) {
+      const session = sessionOf(ctx);
       const id = await labelId(session, name);
       await session.api.gmail("POST", `/messages/${e.item.id}/modify`, { body: { addLabelIds: [id] } });
     },
@@ -69,12 +69,12 @@ export function label(name: string) {
 
 /** Save a reply as a draft in the thread, for the user to review and send. It is never sent. */
 export function draftReply(text: Text) {
-  return defineAction<"gmail", GmailItem, GmailSource>({
+  return defineAction<"gmail", GmailItem, GmailSession>({
     platform: "gmail",
     name: "gmail.draftReply",
     describe: (e) => `draft a reply to ${sender(e)} (not sent)`,
-    async run(e, source) {
-      const session = sessionOf(source);
+    async run(e, ctx) {
+      const session = sessionOf(ctx);
       await session.api.gmail("POST", "/drafts", {
         body: { message: { raw: replyMime(e.item, resolve(text, e)), threadId: e.item.threadId } },
       });

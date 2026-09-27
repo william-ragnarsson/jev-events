@@ -26,6 +26,8 @@ export interface CalendarEvent {
   conferenceData?: { entryPoints?: Array<{ entryPointType?: string; uri?: string }> };
   /** "default", "outOfOffice", "focusTime", "workingLocation", "birthday" or "fromGmail". */
   eventType?: string;
+  /** "transparent" when the event doesn't block time ("Show as: free"). */
+  transparency?: "opaque" | "transparent";
 }
 
 export interface CalendarPerson {
@@ -93,6 +95,8 @@ export interface CalendarItem extends Item<CalendarEvent> {
   /** Opens the event in Google Calendar. */
   link?: string;
   change: EventChange;
+  /** For an invite: the events you're going to at the same time, by title. */
+  clashesWith?: string[];
   /** Why native actions skip this event, e.g. "colleague at acme.com". */
   protectedBecause?: string;
 }
@@ -110,6 +114,8 @@ export interface CalendarItemContext {
   occurrence?: CalendarEvent;
   /** What the account knows about the organizer. */
   organizer?: Person;
+  /** Titles of the events you're going to that overlap this one. */
+  clashesWith?: string[];
   protectedBecause?: string;
   now?: Date;
 }
@@ -168,6 +174,7 @@ export function calendarItem(event: CalendarEvent, context: CalendarItemContext)
   };
   if (location) facts.location = location;
   if (yourResponse) facts.yourResponse = yourResponse;
+  if (context.clashesWith?.length) facts.clashesWith = context.clashesWith;
   if (context.organizer && !organizer.you) {
     facts.organizerIsColleague = context.organizer.colleague;
     if (context.organizer.emailedBefore !== undefined) facts.organizerEmailedBefore = context.organizer.emailedBefore;
@@ -195,6 +202,7 @@ export function calendarItem(event: CalendarEvent, context: CalendarItemContext)
     recurring,
     ...(event.htmlLink ? { link: event.htmlLink } : {}),
     change: context.change,
+    ...(context.clashesWith?.length ? { clashesWith: context.clashesWith } : {}),
     ...(context.protectedBecause ? { protectedBecause: context.protectedBecause } : {}),
   };
 }

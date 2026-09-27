@@ -1,0 +1,240 @@
+---
+title: For your users
+description: Run a monitor for every user who connects an account, from your own web app.
+icon: Users
+---
+
+On your machine, a monitor reads the one account you signed in with `npx jev-events auth`. In a product, each of your users connects their own account, and the same monitor runs once for each of them. `runtime()` does that part. It keeps every connection and its tokens in your Postgres database, serves the sign-in and webhook routes, and checks for new items when your scheduler asks.
+
+<Callout title="The builder writes all of this">
+  Each integration page has a builder. Choose **For my users** under **Where it runs**, and it writes every file on this page for that platform, with the steps to register your app there. Start from [Gmail](/docs/integrations/gmail), [Google Calendar](/docs/integrations/google-calendar), [Slack](/docs/integrations/slack) or [Twitch](/docs/integrations/twitch).
+</Callout>
+
+## How it fits together
+
+<Steps>
+<Step>
+
+**A user connects an account.** A link in your app, such as a Connect Gmail button on the settings page, goes to `/api/jev/connect/google`. The runtime sends them to Google to approve access, and Google sends them back to `/api/jev/callback/google`. The runtime saves the connection with its tokens encrypted, then sends them back to your settings page.
+
+</Step>
+<Step>
+
+**New items arrive.** How depends on the platform. Gmail and Google Calendar are checked whenever your scheduler calls `/api/jev/cron`. Slack sends each message to `/api/jev/webhook/slack`. Twitch chat needs a connection that stays open, which a worker holds.
+
+</Step>
+<Step>
+
+**Each item is judged and handled.** The monitor asks its questions and runs its handlers, once per item, for the account it came from. `e.connection` says whose it was.
+
+</Step>
+</Steps>
+
+## Set it up
+
+This example reads your users' Gmail. Another integration changes the imports, the `apps` entry and how items arrive.
+
+<Steps>
+<Step>
+
+### Install
+
+In your Next.js app:
+
+```bash
+npm i jev-events @jev-events/google pg
+```
+
+</Step>
+<Step>
+
+### Create the runtime
+
+```ts title="lib/jev.ts"
+import { monitor, postgresStore, recipes, runtime } from "jev-events";
+import { google } from "@jev-events/google";
+import { Pool } from "pg";
+import { auth } from "@/auth"; // your auth library
+
+const inbox = monitor({
+  source: google.gmail.inbox(),
+  questions: { kind: recipes.email.kind, needsReply: recipes.email.needsReply },
+})
+  .on("kind:newsletter", { min: 0.9 }, google.gmail.archive())
+  .on("needsReply", { min: 0.8 }, google.gmail.label("Needs reply"));
+
+export const jev = runtime({
+  monitors: [inbox],
+  store: postgresStore(new Pool({ connectionString: process.env.DATABASE_URL })),
+  apps: [google.app({ scopes: ["gmail"] })], // reads GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET
+  signIn: { user: async () => (await auth())?.user?.id }, // who's signed in to your product
+});
+```
+
+</Step>
+<Step>
+
+### Mount the routes
+
+```ts title="app/api/jev/[...path]/route.ts"
+import { jev } from "@/lib/jev";
+
+export const GET = jev.handle;
+export const POST = jev.handle;
+export const maxDuration = 60;
+```
+
+`jev.handle` takes a web `Request` and returns a `Response`, so it also mounts in Hono, SvelteKit or any framework that uses them. The routes work under whatever path you mount it at.
+
+</Step>
+<Step>
+
+### Set the environment
+
+| Variable | What it's for |
+| --- | --- |
+| `TYPESAFE_API_KEY` | Jev. [Get a key](https://docs.typesafe.ai/introduction/quickstart) |
+| `DATABASE_URL` | Your Postgres database, where connections and cursors are kept |
+| `JEV_EVENTS_KEY` | Encrypts tokens in the database. `npx jev-events key` prints one |
+| `CRON_SECRET` | Any long random string. Only requests that send it can run checks |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Your Google OAuth client. The builder walks you through creating it |
+| `JEV_EVENTS_URL` | Where the routes are served, such as `https://acme.dev/api/jev`. Only needed for `connectUrl()`, or behind a proxy that changes the host |
+
+</Step>
+<Step>
+
+### Link to the connect route
+
+```html
+<a href="/api/jev/connect/google?returnTo=/settings">Connect Gmail</a>
+```
+
+</Step>
+<Step>
+
+### Schedule checks
+
+Gmail is checked rather than pushed, so something has to call the cron route every few minutes. See [the cron route](#the-cron-route).
+
+</Step>
+</Steps>
+
+## Connecting accounts
+
+`/api/jev/connect/<integration>` starts a sign-in for whoever is signed in to your product. `signIn.user` tells it who that is: it gets the request and returns your id for the user, usually from your session cookie. The connection is saved with that id as `userId`.
+
+| When | The route answers |
+| --- | --- |
+| `runtime()` has no `signIn` | 404: connect links are off |
+| `signIn.user` returns `undefined` | 401: sign in to your product first |
+| The user approves access | A redirect to `returnTo` with `?connected=google` |
+| They cancel, or it fails | A redirect to `returnTo` with `?connect_error=cancelled` or `?connect_error=failed` |
+| They come back more than 10 minutes later | 400: the sign-in link expired |
+
+`returnTo` must be a path on your site, such as `/settings`. Without it, the user sees a plain page saying what was connected. Connecting the same account again updates its connection instead of adding a second one.
+
+To build the link yourself, for example after your own checks, redirect to `await jev.connectUrl("google", { userId, returnTo: "/settings" })`. It needs `JEV_EVENTS_URL`, or `baseUrl` in `runtime()`.
+
+Your app on each platform has to allow the callback URL, `https://<your site>/api/jev/callback/<integration>`. The builder shows the exact one.
+
+## Keeping it running
+
+Each integration gets new items in one of three ways:
+
+| Integration | New items arrive | What you run |
+| --- | --- | --- |
+| Gmail, Google Calendar | When they're checked | A scheduler that calls the cron route every few minutes |
+| Slack | Slack posts each one to your site | Nothing more. The route answers `/api/jev/webhook/slack` |
+| Twitch | Over a connection that stays open | A worker: a process that stays up |
+| Your own `webhook()` | Your service posts each one | Nothing more. The route answers `/api/jev/webhook/<monitor id>` |
+
+### The cron route
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://acme.dev/api/jev/cron
+```
+
+Each call checks every connection that's due, four at a time and for up to 50 seconds, then answers with counts, such as `{ "checked": 12, "skipped": 0, "failed": 0 }`. Connections it didn't reach are checked on the next call. A connection is due once the monitor's `every` has passed since its last check, so calling the route every 5 minutes checks everyone every 5 minutes.
+
+On the Vercel Pro plan, a `vercel.json` has Vercel call it, and Vercel sends `CRON_SECRET` by itself:
+
+```json title="vercel.json"
+{ "crons": [{ "path": "/api/jev/cron", "schedule": "*/5 * * * *" }] }
+```
+
+Hobby runs crons at most once a day. There, or on another host, have a scheduler such as cron-job.org or a scheduled GitHub Action send the request above. Set `maxDurationMs` in `runtime()` below your platform's time limit for one request if 50 seconds is too long.
+
+### Webhooks
+
+Platforms that send webhooks need your site at a public URL. Slack wants an answer within 3 seconds, so pass `waitUntil` to `runtime()`: the route answers first and judges after. In Next.js, that's `after` from `next/server`. Without it, the route judges before it answers.
+
+```ts
+import { after } from "next/server";
+
+export const jev = runtime({ monitors: [team], store, apps: [slack.app()], waitUntil: after });
+```
+
+A `webhook()` source in a runtime doesn't open a port of its own. It answers POSTs to `/api/jev/webhook/<monitor id>` instead, such as `/api/jev/webhook/tickets` for `monitor({ id: "tickets", source: webhook({ secret }) })`.
+
+### A worker
+
+Chat streams such as Twitch hold a connection open, which serverless functions can't. Run `jev.start()` in a process that stays up, on a host such as Railway, Fly.io or a VPS, with the same environment variables:
+
+```ts title="worker.ts"
+import { jev } from "./lib/jev";
+
+jev.start().catch((error: unknown) => {
+  console.error(error);
+  process.exit(1);
+});
+```
+
+```bash
+npx tsx worker.ts
+```
+
+The worker reads every connection, picks up new ones within 30 seconds, and reconnects with a growing delay after a failure. It also checks polling monitors on their own `every`, so a worker can replace the cron route. The site and the worker share the store, so they can run side by side, and two processes never check the same connection at once.
+
+## Whose account it was
+
+Every event carries `e.connection`: the connection's `id`, `integration`, `userId`, `label` and account facts, without its tokens. Use it to reach the right user from your own handlers:
+
+```ts
+inbox.on("needsReply", { min: 0.8 }, (e) => notifyUser(e.connection?.userId, e.item.subject));
+```
+
+`profile` tells Jev about the person behind each connection, and `budget` can cap each one's spend per day:
+
+```ts
+const invites = monitor({
+  source: google.calendar.invites(),
+  questions,
+  profile: (connection) => profileOf(connection.userId), // what your product knows about them
+  budget: { perConnection: { inputTokensPerDay: 500_000 } },
+});
+```
+
+See [what Jev sees](/docs/concepts/context) and [budgets](/docs/concepts/safety#budgets).
+
+## Managing connections
+
+- **Show them.** `await jev.store.connections.list({ userId })` returns what a user connected, for your settings page. Each has a `label`, such as the email address, and a `status`: `active`, `paused` or `needs-sign-in`.
+- **Disconnect.** `await jev.disconnect(id)` stops reading the connection and forgets it, with its cursors.
+- **Signed out by the platform.** When access is revoked or expires for good, the connection is marked `needs-sign-in`, with a `problem` saying why, and isn't read any more. Monitors emit an `error` event with `needsSignIn: true`. Show a Reconnect link to the same connect route; signing in again makes it active.
+- **Pause.** `await jev.store.connections.update(id, { status: "paused" })` stops reading it, and `{ status: "active" }` starts again.
+- **Tokens you already have.** `await jev.connect(connection)` saves a connection from your own sign-in flow, built with `toConnection()`.
+- **Stats.** `jev.stats()` gives each monitor's counts, latency, tokens and estimated spend in this process.
+
+## The store
+
+`postgresStore()` keeps everything in its own schema, `jev_events`, with two tables it creates on first use. It takes anything with a `query(text, values)` method: a `pg` Pool, Neon's `neon(url)` or PGlite. For postgres.js, pass `{ query: (text, values) => sql.unsafe(text, values) }`.
+
+Tokens are encrypted with AES-256-GCM using `JEV_EVENTS_KEY`. Keep the key as safe as the database: with a different key, saved connections can't be read, and each is marked `needs-sign-in` until its user connects again.
+
+To keep state in another database, implement the `Store` interface. Its `claim` and `add` must be atomic.
+
+## Check it's working
+
+1. Connect your own account through the link. The connection shows up in `jev_events.connections`.
+2. For Gmail or Google Calendar, send yourself an email or an invite, then call the cron route with the `curl` above. `checked` counts the connections that were read, and `failed` the ones that errored; your server logs say why. For Slack or Twitch, write a message where the app can read it.
+3. Monitors start in dry-run, so native actions log a `[dry-run] would …` line instead of running. When those look right, pass `dryRun: false` to `monitor()`.

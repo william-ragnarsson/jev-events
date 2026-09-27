@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { AddressInfo } from "node:net";
 
 import type { CalendarAttendee, CalendarEvent, GmailMessage, GmailPart, GoogleTokens } from "@jev-events/google";
+import type { NewConnection } from "jev-events";
 
 import type { EventTime } from "../src/calendar/item.js";
 
@@ -217,7 +218,13 @@ export class FakeGoogle {
   // -------------------------------------------------------------------------------------------------
   // Sign-in
 
-  /** Tokens for the signed-in account, as `authorize()` would save them. */
+  /** The signed-in account as `authorize()` saves it: tokens, plus the OAuth client that renews them. */
+  connection(): NewConnection {
+    const { email: _email, ...tokens } = this.tokens();
+    return { account: this.me, label: this.me, credentials: tokens, facts: { email: this.me } };
+  }
+
+  /** Tokens for the signed-in account. */
   tokens(): GoogleTokens {
     return {
       clientId: this.clientId,
@@ -587,7 +594,8 @@ export class FakeGoogle {
 
     if (eventId === undefined) {
       if (method !== "GET") return error(404, "calendar");
-      return query.syncToken ? this.#changes(events, query) : this.#fullList(events, query);
+      const timeZone = this.#calendars.get(this.#calendarKey(match[1] ?? ""))?.timeZone ?? "UTC";
+      return query.syncToken ? this.#changes(events, query, timeZone) : this.#fullList(events, query, timeZone);
     }
     const stored = events.get(eventId);
     if (!stored) return error(404, "calendar");
@@ -618,16 +626,21 @@ export class FakeGoogle {
     return error(404, "calendar");
   }
 
-  /** A full list: upcoming events, and a sync token on the last page unless ordered by start. */
-  #fullList(events: Map<string, StoredEvent>, query: Record<string, string>): Reply {
+  /**
+   * A full list: events ending after `timeMin` and starting before `timeMax`, and a sync token on
+   * the last page unless ordered by start.
+   */
+  #fullList(events: Map<string, StoredEvent>, query: Record<string, string>, timeZone: string): Reply {
     const single = query.singleEvents === "true";
     if (query.orderBy === "startTime" && !single) {
       return { status: 400, body: googleError(400, "The requested ordering is not available for the particular query.", "invalid", "INVALID_ARGUMENT") };
     }
     const after = query.timeMin ? Date.parse(query.timeMin) : Number.NEGATIVE_INFINITY;
+    const before = query.timeMax ? Date.parse(query.timeMax) : Number.POSITIVE_INFINITY;
+    const within = (event: FakeEvent) => endMs(event) > after && startMs(event) < before;
     let list = [...events.values()].map((stored) => stored.event).filter((event) => event.status !== "cancelled");
     if (single) list = list.flatMap((event) => instancesOf(event));
-    list = list.filter((event) => (event.recurrence?.length ? instancesOf(event).some((e) => endMs(e) > after) : endMs(event) > after));
+    list = list.filter((event) => (event.recurrence?.length ? instancesOf(event).some(within) : within(event)));
     if (query.orderBy === "startTime") list.sort((a, b) => startMs(a) - startMs(b));
 
     const [offset, upTo] = parsePageToken(query.pageToken, this.#seq);
@@ -636,7 +649,7 @@ export class FakeGoogle {
     const more = offset + size < list.length;
     return ok({
       kind: "calendar#events",
-      timeZone: "UTC",
+      timeZone,
       items: page,
       ...(more ? { nextPageToken: `p-${offset + size}-${upTo}` } : {}),
       ...(!more && query.orderBy !== "startTime" ? { nextSyncToken: `sync-${upTo}` } : {}),
@@ -644,7 +657,7 @@ export class FakeGoogle {
   }
 
   /** What changed since a sync token, cancelled events included. */
-  #changes(events: Map<string, StoredEvent>, query: Record<string, string>): Reply {
+  #changes(events: Map<string, StoredEvent>, query: Record<string, string>, timeZone: string): Reply {
     if (query.timeMin || query.timeMax || query.orderBy) {
       return { status: 400, body: googleError(400, "Sync token cannot be combined with timeMin, timeMax or orderBy.", "invalid", "INVALID_ARGUMENT") };
     }
@@ -660,6 +673,7 @@ export class FakeGoogle {
     const more = offset + size < changed.length;
     return ok({
       kind: "calendar#events",
+      timeZone,
       items: page,
       ...(more ? { nextPageToken: `p-${offset + size}-${upTo}` } : { nextSyncToken: `sync-${upTo}` }),
     });

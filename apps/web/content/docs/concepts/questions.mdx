@@ -4,7 +4,7 @@ description: How choice, noul and score questions become typed events, and how t
 icon: MessageCircleQuestionMark
 ---
 
-The second argument to `listen()` is an object of questions. Jev answers all of them about each item, in one request. Jev Events re-exports TypeSafe's three question builders, so you don't need a second import.
+A monitor's `questions` is an object of questions. Jev answers all of them about each item, in one request. Jev Events re-exports TypeSafe's three question builders, so you don't need a second import.
 
 | Builder | Answers | Events it creates |
 | --- | --- | --- |
@@ -14,7 +14,7 @@ The second argument to `listen()` is an object of questions. Jev answers all of 
 
 <Snippet name="questions" title="questions.ts" />
 
-Event names and payloads are inferred from the questions. `e.answers.kind.probabilities` is typed with your labels, and listening for an event that doesn't exist is a compile error, as the last line above shows.
+Event names and payloads are inferred from the questions. `e.answers.kind.probabilities` is typed with your labels, and handling an event that doesn't exist is a compile error, as the last line above shows.
 
 ## When an event fires
 
@@ -30,7 +30,7 @@ Pick thresholds by what a mistake costs. A wrong highlight is cheap, so fire ear
 
 ## The review band
 
-Add `review` to any policy. When the answer lands between `review` and `min` (or `atLeast`), the handler doesn't run. The listener emits a `review` event instead, so a person can decide:
+Add `review` to any policy. When the answer lands between `review` and `min` (or `atLeast`), the handler doesn't run. The monitor emits a `review` event instead, so a person can decide:
 
 ```ts
 chat.on("hateful", { min: 0.9, review: 0.6 }, twitch.timeout({ seconds: 600 }));
@@ -39,15 +39,19 @@ chat.on("review", (e) => modQueue.add(e)); // 0.6 ≤ p < 0.9: ask a human
 
 ## Special events
 
-Besides outcome events, every listener emits these:
+Besides outcome events, every monitor emits these:
 
 | Event | When | Payload |
 | --- | --- | --- |
-| `judged` | Every item Jev answered | `item`, `answers`, `latencyMs`, `usage`, `cached`, `dryRun`, `protected` |
+| `judged` | Every item Jev answered | `item`, `answers`, `connection`, `monitor`, `latencyMs`, `usage`, `cached`, `dryRun`, `protected` |
 | `review` | An answer fell in a review band | The same, plus `trigger` and the `handler` that didn't run |
-| `action` | A native action ran, would have run, or was skipped | `action`, `description`, `status`, `reason` |
-| `dropped` | An item was skipped before judging | `item`, `reason`: `filtered`, `stale`, `overflow`, `budget` or `stopped` |
-| `error` | Something failed; the listener keeps going | `error`, `phase`: `source`, `judge`, `handler` or `action` |
+| `action` | A native action ran, would have run, or was skipped | `action`, `description`, `status`, `reason`, and the `event` that triggered it |
+| `dropped` | An item was skipped before judging | `item`, `connection`, `reason`: `filtered`, `duplicate`, `stale`, `overflow`, `budget` or `stopped` |
+| `error` | Something failed; the monitor keeps going | `error`, `phase`: `source`, `judge`, `handler` or `action`, and the `connection` it happened for |
+
+Outcome events carry `connection` too: the account the item came from, so one handler can serve every user. It's `undefined` for streams that aren't read as anyone, such as a public chat.
+
+An `error` with `fatal: true` ended one connection's run, which starts again after a delay. One with `needsSignIn: true` means the platform signed the user out: the connection is marked `needs-sign-in` and isn't read again until they reconnect. See [managing connections](/docs/your-users#managing-connections).
 
 ## Writing good questions
 

@@ -49,7 +49,7 @@ npm run eval:report               # rebuild the benchmarks page from results/
 
 | Mode | What's sent |
 | --- | --- |
-| `single` | `{ message: { text, author, ... } }` with each recipe pointed at `message`. This is what a `listen()` source sends. |
+| `single` | `{ message: { text, author, ... } }` with each recipe pointed at `message`. This is what a monitor sends by default. |
 | `plain` | Just the text, with the recipes unchanged. This checks whether the extra structure helps. |
 | `batched-N` | N messages as `{ messages: [...] }`, with every recipe asked once per message and pointed at `` `messages[i]` ``. This is cheaper per request. Accuracy decides whether it becomes an option. |
 

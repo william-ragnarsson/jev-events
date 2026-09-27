@@ -4,61 +4,43 @@ description: Judge messages in the channels and DMs your Slack app is in, then r
 icon: Hash
 ---
 
+Jev Events reads each new message in the channels your Slack app is in, asks Jev your questions about it, and runs what you pick on the answers. Choose below, and the code and the steps to run it fill in.
+
+<Builder integration="slack" />
+
+## Try it without code
+
+To see what Jev says about your own workspace before writing anything, install the integration, set up the app once and watch. It prints an answer for the 5 latest messages, then for each new one:
+
 ```bash
 npm i jev-events @jev-events/slack
-```
-
-`slack.messages({ auth })` emits every new message in the channels and direct messages your app is in. Pass `channels: ["general", "support"]` to watch only those.
-
-<Snippet name="slack" title="triage.ts" />
-
-## Connect a workspace
-
-<Steps>
-<Step>
-
-**Run the setup.**
-
-```bash
 npx jev-events auth slack
+npx jev-events watch slack
 ```
 
-The first time, it prints a link that creates the Slack app with everything filled in: scopes, events and Socket Mode. Pick your workspace, click Next and Create, then **Install to Workspace**.
+`watch slack:general` reads one channel. By default it asks whether each message needs an answer, whether it's urgent, and what kind of message it is. Ask your own with `--ask "bug=Is this reporting a bug?"`. See [the CLI](/docs/cli).
 
-</Step>
-<Step>
+The first time, `auth slack` prints a link that creates the Slack app with everything filled in. Install it to your workspace, paste the two tokens it asks for, and invite the app to a channel with `/invite @jev_events`.
 
-**Paste the two tokens it asks for.** The Bot User OAuth Token (`xoxb-…`) is under OAuth & Permissions. The app-level token (`xapp-…`) is under Basic Information → App-Level Tokens: generate one with the `connections:write` scope. Both are checked, then saved to `.jev-events/credentials.json`, which only your user can read.
+## The source
 
-</Step>
-<Step>
+`slack.messages()` emits each new message in the channels, private channels and DMs the app is in.
 
-**Invite the app.** In each channel it should read, type the `/invite` command the setup printed. Direct messages to the app work right away.
+| Option | Default | What it does |
+| --- | --- | --- |
+| `channels` | Every conversation the app is in | Only these, by name (`"general"` or `"#general"`) or ID |
+| `backfill` | `0` | Also emits this many of the latest messages when starting |
+| `includeBots` | `false` | Also judges messages from bots and integrations |
 
-</Step>
-</Steps>
-
-On a server, use `slack.auth.fromEnv()`, which reads `SLACK_BOT_TOKEN`, plus `SLACK_APP_TOKEN` for Socket Mode or `SLACK_SIGNING_SECRET` for the Events API. If you store tokens yourself, pass them to `slack.auth.withTokens({ token, appToken })`.
-
-## Delivery
+Messages arrive in one of two ways, and the builder sets up the right one:
 
 | | Socket Mode | Events API |
 | --- | --- | --- |
-| Needs | The app-level token | The signing secret and a public URL |
-| Works | Anywhere, even on your laptop | On a server Slack can reach |
-| Choose it with | `delivery: "socket"`, the default with an app-level token | `delivery: "events"`, the default without one |
+| Used | On your machine, with `auth slack` | In your web app, for your users |
+| Needs | The app-level token (`xapp-…`) | The signing secret, and your site at a public URL |
+| Messages arrive | Over a WebSocket the process keeps open | As a POST to `/api/jev/webhook/slack` |
 
-For the Events API, pass each request from Slack to `source.handle()`. It checks Slack's signature, answers the URL check and rejects old requests:
-
-```ts
-const source = slack.messages({ auth: slack.auth.fromEnv() });
-await listen(source, { urgent: recipes.team.urgent }).start();
-
-// app/api/slack/route.ts
-export const POST = (request: Request) => source.handle(request);
-```
-
-Then set the app's Request URL under Event Subscriptions and turn Socket Mode off. The process must stay up. Running in serverless functions comes with [monitors](/docs/roadmap).
+A web app can also use Socket Mode for every workspace that added your app, over one connection: pass `slack.app({ appToken })` or set `SLACK_APP_TOKEN`, and run `jev.start()` in a process that stays up.
 
 ## Actions
 
@@ -66,11 +48,11 @@ Then set the app's Request URL under Event Subscriptions and turn Socket Mode of
 | --- | --- |
 | `slack.reply(text, { broadcast? })` | Replies in the message's thread, or straight into a DM. `broadcast` also posts the reply in the channel. |
 | `slack.react(emoji)` | Adds a reaction, such as `slack.react("eyes")`. |
-| `slack.post(channel, text?)` | Posts in another channel. The default says what fired and who wrote what where, with a link to the message. |
+| `slack.post(channel, text?)` | Posts in another channel. By default it says what fired and who wrote what where, with a link to the message. |
 
-`text` can be a string or a function of the event, and Slack formatting such as `*bold*` works. If the app isn't in the channel, the error says what to type to invite it.
+`text` can be a string or a function of the event, such as ``(e) => `<@${e.item.author.id}> on it` ``, and Slack formatting such as `*bold*` works. When the app isn't in a channel or lacks a scope, the error says what to type or click to fix it. Actions are [dry-run](/docs/concepts/safety) until you pass `dryRun: false` to `monitor()`.
 
-## Message items
+## Messages
 
 Handlers receive a `SlackMessageItem`:
 
@@ -89,7 +71,9 @@ Jev sees the text and the author's name, plus facts: the channel, and whether it
 
 ## Good to know
 
-- **Skipped before judging.** Joins, edits, deletions, the app's own posts and other bots are never judged, so they cost nothing. Pass `includeBots: true` to judge bots and integrations too.
-- **Reconnects.** Socket Mode reconnects by itself, with backoff, including when Slack asks it to. A message Slack delivers twice is judged once.
-- **Missing scopes.** If the app lacks a scope, a warning names it and says where to add it.
-- **Backfill.** `backfill: 5` also emits the 5 latest messages when it starts. `npx jev-events watch slack` does this.
+- **Skipped before judging.** Joins, edits, the app's own posts and other bots are never judged, so they cost nothing.
+- **Slack wants an answer within 3 seconds.** In a web app, the runtime answers Slack first and judges the message after, through `waitUntil: after` from `next/server`. Keep the route's `maxDuration` long enough to judge.
+- **Retries.** A message that fails for a reason that may pass, such as Slack being down, answers an error so Slack sends it again: 3 times over about 5 minutes. A workspace that removed the app answers OK and is marked `needs-sign-in`.
+- **Keep token rotation off** in your app's settings. The saved bot token has to keep working.
+- **A server with one workspace of your own.** `slack.fromEnv()` builds the connection from `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN`: `await team.start({ connections: [slack.fromEnv()] })`.
+- **Your own manifest.** `manifestUrl({ name, requestUrl, redirectUrls })` makes the link that creates the app with everything filled in, and `manifest()` gives it as an object.

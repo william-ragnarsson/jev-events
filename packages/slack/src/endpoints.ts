@@ -5,3 +5,8 @@
 export function apiUrl(baseUrl = process.env.JEV_SLACK_API_URL): string {
   return baseUrl ? `${baseUrl.replace(/\/+$/, "")}/api` : "https://slack.com/api";
 }
+
+/** Slack's consent page, where someone adds your app to their workspace. JEV_SLACK_API_URL moves it too. */
+export function authorizeUrl(baseUrl = process.env.JEV_SLACK_API_URL): string {
+  return baseUrl ? `${baseUrl.replace(/\/+$/, "")}/oauth/v2/authorize` : "https://slack.com/oauth/v2/authorize";
+}

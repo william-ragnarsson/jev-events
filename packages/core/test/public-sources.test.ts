@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { WebSocketServer, type WebSocket as ServerSocket } from "ws";
 
-import { listen, noul, silentLogger, type ErrorEvent, type JudgedEvent } from "../src/index.js";
+import { monitor, noul, silentLogger, type ErrorEvent, type JudgedEvent } from "../src/index.js";
 import { bluesky, twitchChat, type BlueskyPostItem, type TwitchChatItem } from "../src/public/index.js";
 import { mockJev } from "../src/testing.js";
 
@@ -85,7 +85,7 @@ describe("twitchChat (anonymous)", () => {
   it("joins without an account, answers PING, and turns chat into items", async () => {
     const irc = await fakeTwitchIrc();
     const judged: Array<JudgedEvent<TwitchChatItem>> = [];
-    const chat = listen(twitchChat("#SomeChannel", { endpoint: irc.url }), { question }, { client, log: silentLogger }).on(
+    const chat = monitor({ source: twitchChat("#SomeChannel", { endpoint: irc.url }), questions: { question }, client, log: silentLogger }).on(
       "judged",
       (event) => {
         judged.push(event);
@@ -132,7 +132,7 @@ describe("twitchChat (anonymous)", () => {
   it("reconnects and rejoins when Twitch asks it to", async () => {
     const irc = await fakeTwitchIrc();
     const texts: string[] = [];
-    const chat = listen(twitchChat("somechannel", { endpoint: irc.url }), { question }, { client, log: silentLogger }).on(
+    const chat = monitor({ source: twitchChat("somechannel", { endpoint: irc.url }), questions: { question }, client, log: silentLogger }).on(
       "judged",
       (event) => {
         texts.push(event.item.text);
@@ -152,7 +152,7 @@ describe("twitchChat (anonymous)", () => {
       socket.send(`@msg-id=msg_channel_suspended :tmi.twitch.tv NOTICE #${channel} :This channel does not exist or has been suspended.\r\n`),
     );
     const errors: ErrorEvent[] = [];
-    const chat = listen(twitchChat("gonechannel", { endpoint: irc.url }), { question }, { client, log: silentLogger }).on(
+    const chat = monitor({ source: twitchChat("gonechannel", { endpoint: irc.url }), questions: { question }, client, log: silentLogger }).on(
       "error",
       (event) => {
         errors.push(event);
@@ -212,11 +212,12 @@ describe("bluesky", () => {
     ];
     const jetstream = await fakeJetstream(events);
     const judged: Array<JudgedEvent<BlueskyPostItem>> = [];
-    const posts = listen(
-      bluesky({ keywords: ["TypeScript"], langs: ["en"], endpoint: jetstream.url }),
-      { question },
-      { client, log: silentLogger },
-    ).on("judged", (event) => {
+    const posts = monitor({
+      source: bluesky({ keywords: ["TypeScript"], langs: ["en"], endpoint: jetstream.url }),
+      questions: { question },
+      client,
+      log: silentLogger,
+    }).on("judged", (event) => {
       judged.push(event);
     });
 
@@ -242,7 +243,7 @@ describe("bluesky", () => {
   it("resumes from the last event it saw after a disconnect", async () => {
     const events = [post("did:plc:alice", "r1", "first"), post("did:plc:alice", "r2", "second")];
     const jetstream = await fakeJetstream(events);
-    const posts = listen(bluesky({ endpoint: jetstream.url }), { question }, { client, log: silentLogger });
+    const posts = monitor({ source: bluesky({ endpoint: jetstream.url }), questions: { question }, client, log: silentLogger });
 
     await posts.start();
     (jetstream.sockets[0] as ServerSocket).close();

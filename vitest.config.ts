@@ -12,6 +12,7 @@ export default defineConfig({
       { find: /^@jev-events\/twitch$/, replacement: src("./packages/twitch/src/index.ts") },
       { find: /^@jev-events\/google$/, replacement: src("./packages/google/src/index.ts") },
       { find: /^@jev-events\/slack$/, replacement: src("./packages/slack/src/index.ts") },
+      { find: /^@jev-events\/microsoft$/, replacement: src("./packages/microsoft/src/index.ts") },
     ],
   },
   test: {
@@ -19,8 +20,8 @@ export default defineConfig({
       "packages/*/test/**/*.test.ts",
       "evals/test/**/*.test.ts",
       "apps/*/test/**/*.test.ts",
-      // The testing example in the docs runs for real, so it can't rot.
-      "apps/web/snippets/testing.ts",
+      // The testing examples in the docs run for real, so they can't rot.
+      "apps/web/snippets/testing*.ts",
     ],
   },
 });

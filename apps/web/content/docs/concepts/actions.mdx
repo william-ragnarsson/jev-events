@@ -4,13 +4,13 @@ description: Run a built-in platform action or your own code when an outcome fir
 icon: Zap
 ---
 
-Every `.on()` takes an event, an optional policy and a handler. A handler is either **your own function** or a **native action** such as `twitch.timeout()`. You can attach as many handlers to one event as you like, and `.on()` returns the listener so calls chain.
+Every `.on()` takes an event, an optional policy and a handler. A handler is either **your own function** or a **native action** such as `twitch.timeout()`. You can attach as many handlers to one event as you like, and `.on()` returns the monitor so calls chain.
 
 <Snippet name="actions" title="handlers.ts" />
 
 ## Your functions
 
-Your function receives the triggered event: the typed `item`, every `answers`, the `trigger` that fired (event name, label, probability or score), `latencyMs`, `usage`, and whether the answer was `cached`.
+Your function receives the triggered event: the typed `item`, every `answers`, the `trigger` that fired (event name, label, probability or score), the `connection` the item came from, `latencyMs`, `usage`, and whether the answer was `cached`.
 
 Your functions run whenever the outcome fires. Dry-run and protected users only gate native actions, because only you know what your function does. If it has side effects that should respect them, check the flags on the event:
 
@@ -21,22 +21,25 @@ chat.on("kind:spam", (e) => {
 });
 ```
 
-An exception in a handler becomes an `error` event with `phase: "handler"`. It doesn't stop the listener or the other handlers.
+An exception in a handler becomes an `error` event with `phase: "handler"`. It doesn't stop the monitor or the other handlers.
 
 ## Native actions
 
 Native actions call the platform's API: timeouts, bans, deletes, replies. Each one:
 
-- only logs what it would do while the listener is in dry-run, which is the default,
-- never runs on protected users, such as a Twitch channel's broadcaster, moderators and VIPs,
-- belongs to a platform, so attaching a Twitch action to a listener for another platform is a type error,
+- only logs what it would do while the monitor is in dry-run, which is the default,
+- never runs on protected users, such as a Twitch channel's broadcaster and moderators, or your colleagues in Gmail,
+- runs at most once per item, even if a restart judges the item again,
+- belongs to a platform, so attaching a Twitch action to a monitor for another platform is a type error,
 - reports every outcome as an `action` event with a `status` of `done`, `dry-run`, `skipped` or `failed`.
 
-The actions for each platform are listed on its page, starting with [Twitch](/docs/integrations/twitch#actions).
+The actions for each platform are listed on its page: [Gmail](/docs/integrations/gmail#actions), [Google Calendar](/docs/integrations/google-calendar#actions), [Slack](/docs/integrations/slack#actions) and [Twitch](/docs/integrations/twitch#actions).
 
 ## Your own actions
 
-`defineAction()` wraps your code in the same guarantees. Use platform `"*"` for an action that works with any source, or a platform name to restrict it. `describe` is the line printed in dry-run and written to the audit log.
+`defineAction()` wraps your code in the same guarantees, as `flagInDatabase` does above. Use platform `"*"` for an action that works with any source, or a platform name to restrict it. `describe` is the line printed in dry-run and written to the audit log.
+
+`run(e, ctx)` gets the triggered event and `ctx.session`, what the source built for this connection. For the built-in integrations, that includes an API client signed in as the connection's account, such as `ctx.session.api` for Gmail and Slack or `ctx.session.helix` for Twitch, so an action of your own can call an endpoint the integration doesn't wrap yet.
 
 ## Counting with `burst()`
 

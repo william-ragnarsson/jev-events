@@ -1,11 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { authorize, CALENDAR_SCOPE, DEFAULT_SCOPES, fromFile, GMAIL_SCOPE, SETUP_STEPS, type AuthorizeOptions, type GoogleTokens } from "@jev-events/google";
-import { readCredentials, writeCredentials } from "jev-events";
+import { authorize, CALENDAR_SCOPE, DEFAULT_SCOPES, GMAIL_SCOPE, SETUP_STEPS, withTokens, type AuthorizeOptions, type GoogleTokens } from "@jev-events/google";
+import { fileStore, memoryStore, toConnection } from "jev-events";
 
 import { clientFromFile } from "../src/authorize.js";
 import { fakeGoogle, type FakeGoogle } from "./fake-google.js";
@@ -14,7 +14,7 @@ import { waitFor } from "./helpers.js";
 let google: FakeGoogle;
 let dir: string;
 let home: string;
-let path: string;
+let storeDir: string;
 let lines: string[];
 let opened: URL[];
 
@@ -23,8 +23,9 @@ beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), "jev-google-authorize-"));
   home = join(dir, "home");
   mkdirSync(home);
-  path = join(dir, "credentials.json");
+  storeDir = join(dir, ".jev-events");
   vi.stubEnv("HOME", home);
+  vi.stubEnv("JEV_EVENTS_KEY", undefined);
   vi.stubEnv("GOOGLE_CLIENT_ID", undefined);
   vi.stubEnv("GOOGLE_CLIENT_SECRET", undefined);
   lines = [];
@@ -33,6 +34,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   vi.unstubAllEnvs();
+  await fileStore(storeDir).close?.();
   await google.close();
   rmSync(dir, { recursive: true, force: true });
 });
@@ -44,17 +46,29 @@ function browser(url: string): void {
 }
 
 const print = (line: string) => void lines.push(line);
-const saved = () => readCredentials<GoogleTokens>("google", path);
+/** The Google connections saved in the file store. */
+const connections = () => fileStore(storeDir).connections.list({ integration: "google" });
+/** The credentials of the one saved connection. */
+const saved = async () => {
+  const all = await connections();
+  expect(all.length).toBeLessThanOrEqual(1);
+  return all[0]?.credentials as (GoogleTokens & { scopes?: string[] }) | undefined;
+};
 
 /** Sign in with the fake's OAuth client. */
 const signIn = (options: AuthorizeOptions = {}) =>
-  authorize({ "client-id": google.clientId, "client-secret": google.clientSecret, path, print, open: browser, ...options });
+  authorize({ "client-id": google.clientId, "client-secret": google.clientSecret, dir: storeDir, print, open: browser, ...options });
 
 describe("authorize", () => {
-  it("signs in with PKCE and saves tokens that fromFile() can use", async () => {
+  it("signs in with PKCE and saves the connection in .jev-events/store.json", async () => {
     const identity = await signIn();
 
-    expect(identity).toEqual({ email: "me@acme.com", scopes: DEFAULT_SCOPES });
+    expect(identity).toEqual({
+      email: "me@acme.com",
+      scopes: DEFAULT_SCOPES,
+      connection: expect.objectContaining({ id: "google:me@acme.com", integration: "google", label: "me@acme.com", facts: { email: "me@acme.com" }, status: "active" }),
+    });
+    expect(identity.connection).not.toHaveProperty("credentials");
     const url = opened[0]!;
     expect(`${url.origin}${url.pathname}`).toBe(`${google.url}/o/oauth2/v2/auth`);
     expect(Object.fromEntries(url.searchParams)).toEqual({
@@ -68,33 +82,60 @@ describe("authorize", () => {
       access_type: "offline",
       prompt: "consent",
     });
-    expect(saved()).toEqual({
+    // On disk right away, so `jev-events watch` in another terminal finds it.
+    const file = JSON.parse(readFileSync(join(storeDir, "store.json"), "utf8")) as { connections: Record<string, { credentials: GoogleTokens }> };
+    const credentials = file.connections["google:me@acme.com"]?.credentials;
+    expect(credentials).toEqual({
       clientId: "client-1",
       clientSecret: "secret-1",
       accessToken: expect.stringMatching(/^access-/),
       refreshToken: "refresh-2",
       expiresAt: expect.any(Number),
-      email: "me@acme.com",
       scopes: DEFAULT_SCOPES,
     });
-    await expect(fromFile(path).refresh()).resolves.toMatch(/^access-/);
+    await expect(withTokens(credentials!).refresh()).resolves.toMatch(/^access-/);
+  });
+
+  it("saves into the store you pass instead", async () => {
+    const store = memoryStore();
+
+    await signIn({ store });
+
+    expect((await store.connections.list()).map((connection) => connection.id)).toEqual(["google:me@acme.com"]);
+    expect(await connections()).toEqual([]);
+    expect(lines).toContain("  Signed in as me@acme.com.");
+  });
+
+  it("replaces the connection when the same account signs in again", async () => {
+    await signIn();
+    await signIn();
+
+    expect((await connections()).map((connection) => connection.id)).toEqual(["google:me@acme.com"]);
+    expect((await saved())?.refreshToken).toBe("refresh-3");
   });
 
   it("prints the link, where it saved the sign-in and what to try next", async () => {
     await signIn();
 
     expect(lines).toContain(`  ${opened[0]!.href}`);
-    expect(lines).toContain(`  Signed in as me@acme.com. Saved to ${path}.`);
+    expect(lines).toContain(`  Signed in as me@acme.com. Saved to ${join(storeDir, "store.json")}.`);
     expect(lines.slice(-3)).toEqual(["", "  Try it:  npx jev-events watch gmail", "           npx jev-events watch calendar"]);
     expect(lines.join("\n")).not.toMatch(/didn't allow|no refresh token/);
   });
 
-  it("asks for only the scopes you pass", async () => {
-    const identity = await signIn({ scopes: `openid, email ${CALENDAR_SCOPE}` });
+  it("asks for only the access you pass, plus the address", async () => {
+    const identity = await signIn({ scopes: "calendar" });
 
     expect(opened[0]?.searchParams.get("scope")).toBe(`openid email ${CALENDAR_SCOPE}`);
     expect(identity.scopes).toEqual(["openid", "email", CALENDAR_SCOPE]);
     expect(lines.join("\n")).not.toContain("didn't allow");
+    expect(lines.slice(-2)).toEqual(["", "  Try it:  npx jev-events watch calendar"]);
+  });
+
+  it("takes full scope URLs, separated by commas or spaces", async () => {
+    await signIn({ scopes: `${GMAIL_SCOPE}, ${CALENDAR_SCOPE}` });
+
+    expect(opened[0]?.searchParams.get("scope")).toBe(DEFAULT_SCOPES.join(" "));
   });
 
   it.each([
@@ -116,29 +157,32 @@ describe("authorize", () => {
     await signIn();
 
     expect(lines).toContain("  Google sent no refresh token, so you'll need to sign in again in an hour.");
-    expect(saved()).not.toHaveProperty("refreshToken");
+    expect(await saved()).not.toHaveProperty("refreshToken");
   });
 
-  it("leaves out the address when you don't share it", async () => {
-    const identity = await signIn({ scopes: GMAIL_SCOPE });
+  it("names the connection after the account when Google doesn't share the address", async () => {
+    google.consent({ withhold: ["openid", "email"] });
+
+    const identity = await signIn();
 
     expect(identity.email).toBeUndefined();
-    expect(saved()).not.toHaveProperty("email");
-    expect(lines).toContain(`  Signed in. Saved to ${path}.`);
+    expect(identity.connection).toMatchObject({ id: "google:google", label: "google" });
+    expect(identity.connection).not.toHaveProperty("facts");
+    expect(lines).toContain(`  Signed in. Saved to ${join(storeDir, "store.json")}.`);
   });
 
   it("stops when you cancel on Google's page", async () => {
     google.consent({ deny: true });
 
     await expect(signIn()).rejects.toThrow("Sign-in cancelled.");
-    expect(saved()).toBeUndefined();
+    expect(await saved()).toBeUndefined();
   });
 
   it("explains a wrong client secret", async () => {
     await expect(signIn({ "client-secret": "wrong" })).rejects.toThrow(
-      "Google refused the sign-in: Unauthorized. Check the client ID and secret, or delete them and run this again to set up a new client.",
+      "Google refused the sign-in: Unauthorized. Check the client ID and secret, or pass the right ones with --client-id and --client-secret.",
     );
-    expect(saved()).toBeUndefined();
+    expect(await saved()).toBeUndefined();
   });
 
   it("ignores a stale sign-in link and gives up after the timeout", async () => {
@@ -161,7 +205,7 @@ describe("finding your OAuth client", () => {
   it("reuses the client from the last sign-in", async () => {
     await signIn();
 
-    await authorize({ path, print, open: browser });
+    await authorize({ dir: storeDir, print, open: browser });
 
     expect(opened[1]?.searchParams.get("client_id")).toBe("client-1");
     expect(google.calls("POST /token").at(-1)?.body).toMatchObject({ client_id: "client-1", client_secret: "secret-1" });
@@ -171,19 +215,23 @@ describe("finding your OAuth client", () => {
     vi.stubEnv("GOOGLE_CLIENT_ID", google.clientId);
     vi.stubEnv("GOOGLE_CLIENT_SECRET", google.clientSecret);
 
-    await expect(authorize({ path, print, open: browser })).resolves.toMatchObject({ email: "me@acme.com" });
+    await expect(authorize({ dir: storeDir, print, open: browser })).resolves.toMatchObject({ email: "me@acme.com" });
+    expect(await saved()).toMatchObject({ clientId: "client-1", clientSecret: "secret-1" });
   });
 
   it("doesn't send the saved secret to a different client", async () => {
     await google.close();
     google = await fakeGoogle({ clientId: "public-client", clientSecret: "" });
-    writeCredentials("google", { clientId: "old-client", clientSecret: "old-secret", refreshToken: "refresh-old" }, path);
+    await fileStore(storeDir).connections.save(
+      toConnection("google", { account: "old@acme.com", credentials: { clientId: "old-client", clientSecret: "old-secret", refreshToken: "refresh-old" } }),
+    );
 
-    await authorize({ "client-id": "public-client", path, print, open: browser });
+    await authorize({ "client-id": "public-client", dir: storeDir, print, open: browser });
 
     expect(google.calls("POST /token")[0]?.body).not.toHaveProperty("client_secret");
-    expect(saved()).toMatchObject({ clientId: "public-client" });
-    expect(saved()).not.toHaveProperty("clientSecret");
+    const connection = (await connections()).find((saved) => saved.id === "google:me@acme.com");
+    expect(connection?.credentials).toMatchObject({ clientId: "public-client" });
+    expect(connection?.credentials).not.toHaveProperty("clientSecret");
   });
 });
 
@@ -215,7 +263,7 @@ describe("first-time setup", () => {
     const file = download("client_secret_new.apps.googleusercontent.com.json", client());
     const { asked, ask } = terminal("");
 
-    await authorize({ path, print, open: browser, ask });
+    await authorize({ dir: storeDir, print, open: browser, ask });
 
     expect(lines).toEqual(
       expect.arrayContaining([
@@ -225,7 +273,7 @@ describe("first-time setup", () => {
       ]),
     );
     expect(asked).toEqual([QUESTION]);
-    expect(saved()).toMatchObject({ clientId: "client-1", clientSecret: "secret-1", email: "me@acme.com" });
+    expect(await saved()).toMatchObject({ clientId: "client-1", clientSecret: "secret-1" });
   });
 
   it.each([
@@ -237,19 +285,19 @@ describe("first-time setup", () => {
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, JSON.stringify(client()));
 
-    await authorize({ path, print, open: browser, ask: terminal(drag(file)).ask });
+    await authorize({ dir: storeDir, print, open: browser, ask: terminal(drag(file)).ask });
 
     expect(lines).toContain(`  Using ${file}`);
-    expect(saved()).toMatchObject({ clientId: "client-1" });
+    expect(await saved()).toMatchObject({ clientId: "client-1" });
   });
 
   it("takes a client ID and secret pasted instead of the file", async () => {
     const { asked, ask } = terminal(google.clientId, google.clientSecret);
 
-    await authorize({ path, print, open: browser, ask });
+    await authorize({ dir: storeDir, print, open: browser, ask });
 
     expect(asked).toEqual([QUESTION, "  Client secret: "]);
-    expect(saved()).toMatchObject({ clientId: "client-1", clientSecret: "secret-1" });
+    expect(await saved()).toMatchObject({ clientId: "client-1", clientSecret: "secret-1" });
   });
 
   it("asks again until it gets a client file, saying what was wrong", async () => {
@@ -261,7 +309,7 @@ describe("first-time setup", () => {
     writeFileSync(web, JSON.stringify({ web: { client_id: google.clientId, client_secret: google.clientSecret } }));
     const { asked, ask } = terminal("", notJson, serviceAccount, web);
 
-    await authorize({ path, print, open: browser, ask });
+    await authorize({ dir: storeDir, print, open: browser, ask });
 
     expect(asked).toHaveLength(4);
     expect(lines).toEqual(
@@ -272,13 +320,13 @@ describe("first-time setup", () => {
         `  Using ${web}`,
       ]),
     );
-    expect(saved()).toMatchObject({ clientId: "client-1" });
+    expect(await saved()).toMatchObject({ clientId: "client-1" });
   });
 
   it("gives up after five tries", async () => {
     const { asked, ask } = terminal();
 
-    await expect(authorize({ path, print, open: browser, ask })).rejects.toThrow("No OAuth client given.");
+    await expect(authorize({ dir: storeDir, print, open: browser, ask })).rejects.toThrow("No OAuth client given.");
     expect(asked).toHaveLength(5);
     expect(google.requests).toEqual([]);
   });
@@ -287,7 +335,7 @@ describe("first-time setup", () => {
     const original = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
     Object.defineProperty(process.stdin, "isTTY", { value: undefined, configurable: true, writable: true });
     try {
-      await expect(authorize({ path, print, open: browser })).rejects.toThrow(
+      await expect(authorize({ dir: storeDir, print, open: browser })).rejects.toThrow(
         [
           "Google needs an OAuth client of your own first (one-time, about 3 minutes):",
           "",

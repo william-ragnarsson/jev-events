@@ -18,7 +18,7 @@ import {
   describeItem,
   from,
   JEV_USD_PER_MILLION_INPUT_TOKENS,
-  listen,
+  monitor,
   recipes,
   silentLogger,
   toItem,
@@ -101,14 +101,16 @@ const outDir = args.out ?? join(ROOT, "evals", "results", ...(args.mock ? ["mock
 
 // ---------------------------------------------------------------------------
 
-/** Through `listen()`, exactly as an app would: one request per message. */
-async function runListener(examples: ChatExample[], mode: "single" | "plain", rate: number): Promise<Run> {
+/** Through `monitor()`, exactly as an app would: one request per message. */
+async function runMonitor(examples: ChatExample[], mode: "single" | "plain", rate: number): Promise<Run> {
   const run: Run = { predictions: new Map(), errors: 0, requests: 0, model: "unknown" };
   const source = from(
     examples.map((example, index) => toChatItem(example, index)),
     { id: `eval:${args.dataset}`, noun: "message" },
   );
-  const listener = listen(source, QUESTIONS, {
+  const judge = monitor({
+    source,
+    questions: QUESTIONS,
     client,
     log: silentLogger,
     rate: { perSecond: rate, burst: rate, concurrency: Math.max(1, Math.ceil(rate)) },
@@ -117,17 +119,17 @@ async function runListener(examples: ChatExample[], mode: "single" | "plain", ra
     // "plain" sends the bare text with the recipes unchanged, to check that the structure helps.
     ...(mode === "plain" ? { state: (item) => item.text, inspect: false as const } : { inspect: "message" }),
   });
-  listener.on("judged", (event) => {
+  judge.on("judged", (event) => {
     run.model = event.model;
     if (!event.cached) run.requests++;
     run.predictions.set(event.item.id, fromJudged(event));
     progress(run.predictions.size, examples.length, mode);
   });
-  listener.on("error", (event) => {
+  judge.on("error", (event) => {
     run.errors++;
     process.stderr.write(`\n${event.phase} error: ${event.error instanceof Error ? event.error.message : String(event.error)}\n`);
   });
-  await listener.run();
+  await judge.run();
   return run;
 }
 
@@ -274,7 +276,7 @@ async function main(): Promise<void> {
     const run =
       mode === "batched"
         ? await runBatched(examples, Number(args.batch), Number(args.rate))
-        : await runListener(examples, mode, Number(args.rate));
+        : await runMonitor(examples, mode, Number(args.rate));
     const report = buildReport({
       dataset: args.dataset,
       mode: mode === "batched" ? `batched-${args.batch}` : mode,

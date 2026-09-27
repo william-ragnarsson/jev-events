@@ -1,5 +1,6 @@
-import { react, post, reply } from "./actions.js";
-import { fromEnv, fromFile, withTokens } from "./auth.js";
+import { post, react, reply } from "./actions.js";
+import { app } from "./app.js";
+import { fromEnv } from "./auth.js";
 import { messages } from "./messages.js";
 
 /**
@@ -7,23 +8,31 @@ import { messages } from "./messages.js";
  *
  * @example
  * ```ts
- * const auth = slack.auth.fromFile(); // saved by: npx jev-events auth slack
+ * const team = monitor({ source: slack.messages(), questions: { needsAnswer: recipes.team.needsAnswer } })
+ *   .on("needsAnswer", { min: 0.8 }, slack.react("eyes"))
+ *   .on("needsAnswer", { min: 0.8 }, slack.post("#support-queue"));
  *
- * const team = listen(slack.messages({ auth }), { needsAnswer: recipes.team.needsAnswer });
- * team.on("needsAnswer", { min: 0.8 }, slack.react("eyes"));
- * team.on("needsAnswer", { min: 0.8 }, slack.post("#support-queue"));
+ * await team.start(); // the workspace `npx jev-events auth slack` saved
+ *
+ * export const jev = runtime({ monitors: [team], store, apps: [slack.app()] });
  * ```
  */
 export const slack = {
+  /** Your Slack app, so people can add it to their workspaces and Slack can send events. */
+  app,
+  /** One workspace of your own from SLACK_BOT_TOKEN, plus SLACK_APP_TOKEN for Socket Mode. */
+  fromEnv,
   messages,
   reply,
   react,
   post,
-  auth: { fromFile, fromEnv, withTokens },
 } as const;
 
+export { app, type SlackApp, type SlackAppOptions } from "./app.js";
+export { BOT_EVENTS, BOT_SCOPES } from "./scopes.js";
+export { manifest, MANIFEST, manifestUrl, type ManifestOptions } from "./manifest.js";
 export { post, react, reply, type ReplyOptions, type Text } from "./actions.js";
-export { messages, type Delivery, type MessagesOptions, type SlackMessagesSource, type SlackSession } from "./messages.js";
+export { messages, type MessagesOptions, type SlackMessagesSource, type SlackSession } from "./messages.js";
 export {
   botAuthor,
   channelTypeOf,
@@ -47,10 +56,18 @@ export {
   type SlackConversation,
   type SlackUser,
 } from "./directory.js";
-export { checkTokens, fromEnv, fromFile, SlackAuthError, withTokens, type SlackAuth, type SlackTokens } from "./auth.js";
-export { authorize, MANIFEST, SETUP_STEPS, type AuthorizeOptions, type SlackWorkspace } from "./authorize.js";
+export { checkTokens, fromEnv, SlackAuthError, tokensOf, type SlackTokens, type TokenNames } from "./auth.js";
+export { authorize, SETUP_STEPS, type AuthorizeOptions, type SlackWorkspace } from "./authorize.js";
 export { isFatal, SlackApi, SlackApiError, type SlackApiOptions, type SlackParams, type SlackResponse } from "./api.js";
 export { handleEventsRequest, slackSignature, type EventsApiOptions } from "./events-api.js";
-export { socketMode, SocketModeError, type EventCallback, type SocketModeOptions } from "./socket.js";
+export {
+  sharedSocket,
+  socketMode,
+  SocketModeError,
+  teamsOf,
+  type EventCallback,
+  type SharedSocketOptions,
+  type SocketModeOptions,
+} from "./socket.js";
 export { mentionsIn, mrkdwnToText, type Mentions } from "./text.js";
 export { cli } from "./cli.js";

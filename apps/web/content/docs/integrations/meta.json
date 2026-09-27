@@ -1,4 +1,4 @@
 {
   "title": "Integrations",
-  "pages": ["google", "slack", "twitch", "custom"]
+  "pages": ["gmail", "google-calendar", "slack", "twitch", "custom"]
 }

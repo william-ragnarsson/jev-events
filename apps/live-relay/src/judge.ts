@@ -1,4 +1,4 @@
-import { listen, recipes, type DailyBudget, type JevClient, type JudgedEvent, type Logger } from "jev-events";
+import { monitor, recipes, type DailyBudget, type JevClient, type JudgedEvent, type Logger } from "jev-events";
 import { twitchChat, type TwitchChatItem, type TwitchPublicChatOptions } from "jev-events/public";
 
 export const questions = { kind: recipes.chat.kind, hateful: recipes.chat.hateful };
@@ -17,7 +17,9 @@ export interface JudgeOptions {
 
 /** The whole demo: read a public Twitch chat and label every message it has time for. */
 export function judgeChat(channel: string, options: JudgeOptions) {
-  const chat = listen(twitchChat(channel, options.chat), questions, {
+  const chat = monitor({
+    source: twitchChat(channel, options.chat),
+    questions,
     rate: { perSecond: options.perSecond, burst: options.perSecond },
     maxQueue: 3, // label what chat is saying now and skip the backlog
     maxLagMs: 3_000,

@@ -3,6 +3,8 @@ import type { AddressInfo } from "node:net";
 
 import { WebSocketServer, type WebSocket as ServerSocket } from "ws";
 
+import type { NewConnection } from "jev-events";
+
 import type { ApiConversation, ApiUser, ConversationKind, EventCallback, SlackMessageEvent } from "@jev-events/slack";
 
 // A fake Slack on one local port: the Web API methods the Slack package calls, and Socket Mode over
@@ -11,6 +13,8 @@ import type { ApiConversation, ApiUser, ConversationKind, EventCallback, SlackMe
 
 export const BOT_TOKEN = "xoxb-1-fake-bot-token";
 export const APP_TOKEN = "xapp-1-fake-app-token";
+/** The app's OAuth client, for installs through `/connect/slack`. */
+export const CLIENT = { id: "1111.2222", secret: "fake-client-secret" } as const;
 
 export const TEAM = { id: "T0ACME", name: "Acme", url: "https://acme.slack.com/" } as const;
 /** The app's bot user. */
@@ -64,6 +68,11 @@ export interface FakeMessage {
   files?: SlackMessageEvent["files"];
   /** Default true: send it over Socket Mode too. false: only put it in the channel's history. */
   live?: boolean;
+}
+
+export interface SendOptions {
+  /** The workspace the event is from. Default Acme. */
+  team?: string;
 }
 
 export interface FakeCall {
@@ -167,6 +176,8 @@ export class FakeSlack {
   readonly #overrides = new Map<string, Override[]>();
   readonly #delays = new Map<string, number>();
   readonly #tickets = new Set<string>();
+  /** OAuth codes handed out, each with the redirect it was for. */
+  readonly #codes = new Map<string, string | undefined>();
   readonly #scopes = new Set([
     "channels:history",
     "groups:history",
@@ -271,17 +282,34 @@ export class FakeSlack {
   }
 
   /** Send any event over Socket Mode, such as an edit or a reaction. Returns its envelope ID. */
-  send(event: Record<string, unknown> & { type: string }): string {
+  send(event: Record<string, unknown> & { type: string }, options: SendOptions = {}): string {
     const envelope: Envelope = {
       envelope_id: `env-${++this.#seq}`,
       type: "events_api",
       accepts_response_payload: false,
       retry_attempt: 0,
       retry_reason: "",
-      payload: { type: "event_callback", team_id: TEAM.id, event_id: `Ev${this.#seq}`, event_time: Math.floor(Date.now() / 1000), event },
+      payload: callback(event, `Ev${this.#seq}`, options.team ?? TEAM.id),
     };
     this.#deliver(envelope);
     return envelope.envelope_id;
+  }
+
+  /** The connection `npx jev-events auth slack` saves for this workspace. `appToken: false` leaves the app token out. */
+  connection(options: { appToken?: boolean } = {}): NewConnection {
+    return {
+      account: TEAM.id,
+      label: TEAM.name,
+      credentials: { token: BOT_TOKEN, ...(options.appToken === false ? {} : { appToken: APP_TOKEN }) },
+      facts: { team: TEAM.name, teamId: TEAM.id, userId: BOT.userId, user: BOT.handle, url: TEAM.url, botId: BOT.botId },
+    };
+  }
+
+  /** A one-time code, as in Slack's redirect after someone clicks Allow. */
+  code(redirectUri?: string): string {
+    const code = `code-${++this.#seq}`;
+    this.#codes.set(code, redirectUri);
+    return code;
   }
 
   /** Send the last event again, the way Slack does when it doesn't hear an acknowledgement in time. */
@@ -429,6 +457,7 @@ export class FakeSlack {
 
   #route(method: string, params: Record<string, string>, token: string | undefined): Reply {
     if (method === "apps.connections.open") return this.#open(token);
+    if (method === "oauth.v2.access") return this.#install(params);
 
     if (!token) return fail("not_authed");
     if (token.startsWith("xapp-")) return fail("not_allowed_token_type");
@@ -521,6 +550,28 @@ export class FakeSlack {
     return ok({ url: `${this.url.replace(/^http/, "ws")}/link/?ticket=${ticket}&app_id=${BOT.appId}` });
   }
 
+  /** oauth.v2.access: trade a one-time code for the workspace's bot token. */
+  #install(params: Record<string, string>): Reply {
+    if (params.client_id !== CLIENT.id) return fail("invalid_client_id");
+    if (params.client_secret !== CLIENT.secret) return fail("bad_client_secret");
+    const code = params.code ?? "";
+    if (!this.#codes.has(code)) return fail("invalid_code");
+    const redirectUri = this.#codes.get(code);
+    this.#codes.delete(code);
+    if (redirectUri !== undefined && params.redirect_uri !== redirectUri) return fail("bad_redirect_uri");
+    return ok({
+      access_token: BOT_TOKEN,
+      token_type: "bot",
+      scope: [...this.#scopes].join(","),
+      bot_user_id: BOT.userId,
+      app_id: BOT.appId,
+      team: { id: TEAM.id, name: TEAM.name },
+      enterprise: null,
+      is_enterprise_install: false,
+      authed_user: { id: ANN },
+    });
+  }
+
   /** Public channels, and private ones and DMs the app is in. */
   #canSee(conversation: Conversation): boolean {
     return conversation.kind === "channel" || conversation.members.has(BOT.userId);
@@ -553,6 +604,19 @@ export class FakeSlack {
     const end = start + size;
     return { page: entries.slice(start, end), next: end < entries.length ? Buffer.from(`offset:${end}`).toString("base64") : "" };
   }
+}
+
+/** An Events API payload, as Slack sends it over Socket Mode and to a Request URL. */
+export function callback(event: Record<string, unknown> & { type: string }, eventId: string, team: string = TEAM.id): EventCallback {
+  const payload = {
+    type: "event_callback",
+    team_id: team,
+    event_id: eventId,
+    event_time: Math.floor(Date.now() / 1000),
+    authorizations: [{ team_id: team, user_id: BOT.userId, is_bot: true }],
+    event,
+  };
+  return payload;
 }
 
 function typesOf(types: string): Set<ConversationKind> {

@@ -1,7 +1,7 @@
 {
   "name": "@jev-events/twitch",
   "version": "0.1.0",
-  "description": "Twitch chat for Jev Events: EventSub chat, timeouts, bans, deletes, warnings, replies and clips.",
+  "description": "Twitch for Jev Events: chat over EventSub on your channel or your users', with timeouts, bans, deletes, warnings, replies and clips.",
   "type": "module",
   "license": "MIT",
   "author": "William Ragnarsson",

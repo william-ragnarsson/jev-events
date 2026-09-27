@@ -2,13 +2,13 @@ import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { readCredentials, writeCredentials } from "jev-events";
+import { fileStore, toConnection } from "jev-events";
 
 import { fakeJevServer, type FakeJev } from "../../core/test/fake-jev.js";
 import { liveCli, runCli, type LiveCli } from "../../core/test/run-cli.js";
-import { APP_TOKEN, BOB, BOT, BOT_TOKEN, fakeSlack, GENERAL, RANDOM, TEAM, type FakeSlack } from "./fake-slack.js";
+import { APP_TOKEN, BOB, BOT_TOKEN, fakeSlack, GENERAL, RANDOM, type FakeSlack } from "./fake-slack.js";
 import { waitFor } from "./helpers.js";
 
 // These run the real CLI in a child process. It talks HTTP and Socket Mode to a fake Slack (the
@@ -23,7 +23,15 @@ let live: LiveCli[] = [];
 beforeEach(async () => {
   jev = await fakeJevServer();
   slack = await fakeSlack();
-  env = { TYPESAFE_API_KEY: "test-key", TYPESAFE_BASE_URL: jev.url, SLACK_BOT_TOKEN: undefined, SLACK_APP_TOKEN: undefined, SLACK_SIGNING_SECRET: undefined };
+  vi.stubEnv("JEV_EVENTS_KEY", undefined);
+  env = {
+    TYPESAFE_API_KEY: "test-key",
+    TYPESAFE_BASE_URL: jev.url,
+    SLACK_BOT_TOKEN: undefined,
+    SLACK_APP_TOKEN: undefined,
+    SLACK_SIGNING_SECRET: undefined,
+    JEV_EVENTS_KEY: undefined,
+  };
   // Real path, since macOS's temp folder is behind a symlink.
   cwd = realpathSync(mkdtempSync(join(tmpdir(), "jev-slack-cli-")));
 });
@@ -33,14 +41,30 @@ afterEach(async () => {
   live = [];
   await jev.close();
   await slack.close();
+  vi.unstubAllEnvs();
   rmSync(cwd, { recursive: true, force: true });
 });
 
-const credentials = () => join(cwd, ".jev-events", "credentials.json");
+const saved = () => fileStore(join(cwd, ".jev-events"));
+const storeFile = () => join(cwd, ".jev-events", "store.json");
 
 /** Save the fake workspace where `jev-events auth slack` saves it. */
-const connectSlack = () =>
-  writeCredentials("slack", { token: BOT_TOKEN, appToken: APP_TOKEN, team: TEAM.name, teamId: TEAM.id, userId: BOT.userId, user: BOT.handle }, credentials());
+async function connectSlack(credentials: Record<string, string> = {}): Promise<void> {
+  const store = saved();
+  const connection = slack.connection();
+  await store.connections.save(toConnection("slack", { ...connection, credentials: { ...connection.credentials, ...credentials } }));
+  await store.close?.();
+}
+
+/** What the store in .jev-events holds now, as the next `jev-events` run reads it. */
+async function savedConnections() {
+  const store = saved();
+  try {
+    return await store.connections.list({ integration: "slack" });
+  } finally {
+    await store.close?.();
+  }
+}
 
 function watch(source: string, extra: Record<string, string | undefined> = {}): LiveCli {
   const cli = liveCli(["watch", source], { ...env, ...extra }, cwd);
@@ -49,10 +73,11 @@ function watch(source: string, extra: Record<string, string | undefined> = {}): 
 }
 
 const questionsAsked = () => jev.requests.map((request) => Object.keys(request.body.questions ?? {}));
+const signedOut = "Slack signed this workspace out (token_revoked): the token was revoked or isn't valid.";
 
 describe("jev-events watch slack", () => {
   it("judges the latest messages, then new ones as they're posted", async () => {
-    connectSlack();
+    await connectSlack();
     slack.post({ channel: GENERAL, text: "Deploy at 5", live: false });
     slack.post({ channel: RANDOM, user: BOB, text: "Lunch anyone?", live: false });
 
@@ -77,7 +102,7 @@ describe("jev-events watch slack", () => {
   }, 30_000);
 
   it("watches only the channels you name with slack:<channel>", async () => {
-    connectSlack();
+    await connectSlack();
     slack.post({ channel: RANDOM, text: "Lunch anyone?", live: false });
     slack.post({ channel: GENERAL, text: "Deploy at 5", live: false });
 
@@ -90,7 +115,8 @@ describe("jev-events watch slack", () => {
     expect(run.stdout).not.toContain("Lunch anyone?");
   }, 30_000);
 
-  it("takes the tokens from a .env file instead", async () => {
+  it("uses the tokens in .env instead of the saved workspace, and saves nothing", async () => {
+    await connectSlack({ token: "xoxb-1-old-token" });
     writeFileSync(join(cwd, ".env"), `SLACK_BOT_TOKEN=${BOT_TOKEN}\nSLACK_APP_TOKEN=${APP_TOKEN}\n`);
     slack.post({ channel: GENERAL, text: "Deploy at 5", live: false });
 
@@ -99,13 +125,34 @@ describe("jev-events watch slack", () => {
     const run = await cli.stop();
 
     expect(run.stderr).toBe("");
-    expect(existsSync(credentials())).toBe(false);
+    expect((await savedConnections()).map((connection) => [connection.id, connection.credentials.token, connection.status ?? "active"])).toEqual([
+      ["slack:T0ACME", "xoxb-1-old-token", "active"],
+    ]);
+  }, 30_000);
+
+  it("works from .env alone, without a saved workspace", async () => {
+    writeFileSync(join(cwd, ".env"), `SLACK_BOT_TOKEN=${BOT_TOKEN}\nSLACK_APP_TOKEN=${APP_TOKEN}\n`);
+    slack.post({ channel: GENERAL, text: "Deploy at 5", live: false });
+
+    const cli = watch("slack");
+    await waitFor(() => cli.lines().some((line) => line.includes("Deploy at 5")), 20_000, "the message");
+    const run = await cli.stop();
+
+    expect(run.stderr).toBe("");
+    expect(existsSync(storeFile())).toBe(false);
+  }, 30_000);
+
+  it("asks for SLACK_APP_TOKEN too when only SLACK_BOT_TOKEN is set", async () => {
+    const run = await runCli(["watch", "slack"], { env: { ...env, SLACK_BOT_TOKEN: BOT_TOKEN }, cwd });
+
+    expect(run.stderr).toBe("✖ Set SLACK_APP_TOKEN (xapp-…) too: the CLI gets new messages over Socket Mode, which needs the app-level token.\n");
+    expect(run.code).toBe(1);
   }, 30_000);
 
   it("asks you to connect Slack first, before asking for a TypeSafe key", async () => {
     const run = await runCli(["watch", "slack"], { env: { ...env, TYPESAFE_API_KEY: undefined }, cwd });
 
-    expect(run.stderr).toBe("✖ Connect Slack first: npx jev-events auth slack\n");
+    expect(run.stderr).toBe("✖ Connect a Slack workspace first: npx jev-events auth slack\n");
     expect(run.stdout).toBe("");
     expect(run.code).toBe(1);
   }, 30_000);
@@ -113,22 +160,37 @@ describe("jev-events watch slack", () => {
   it("gives the command that works in this repo under npm run cli", async () => {
     const run = await runCli(["watch", "slack"], { env: { ...env, npm_lifecycle_event: "cli" }, cwd });
 
-    expect(run.stderr).toBe("✖ Connect Slack first: npm run cli -- auth slack\n");
+    expect(run.stderr).toBe("✖ Connect a Slack workspace first: npm run cli -- auth slack\n");
   }, 30_000);
 
-  it("says so when Slack signed the app out", async () => {
-    connectSlack();
+  it("says so when Slack signed the workspace out, and remembers it for next time", async () => {
+    await connectSlack();
+    slack.revoke();
+
+    const first = await runCli(["watch", "slack"], { env, cwd });
+    const second = await runCli(["watch", "slack"], { env, cwd });
+
+    expect(first.stderr).toContain(`✖ ${signedOut} Sign in again: npx jev-events auth slack`);
+    expect(first.code).toBe(1);
+    expect(second.stderr).toBe(`✖ Acme needs a new sign-in: npx jev-events auth slack\n  ${signedOut}\n`);
+    expect(second.code).toBe(1);
+    expect(await savedConnections()).toMatchObject([{ status: "needs-sign-in", problem: signedOut }]);
+    expect(jev.requests).toEqual([]);
+  }, 30_000);
+
+  it("says to check the variable when Slack refuses the token from .env", async () => {
+    writeFileSync(join(cwd, ".env"), `SLACK_BOT_TOKEN=${BOT_TOKEN}\nSLACK_APP_TOKEN=${APP_TOKEN}\n`);
     slack.revoke();
 
     const run = await runCli(["watch", "slack"], { env, cwd });
 
-    expect(run.stderr).toContain("✖ Slack signed you out (token_revoked): the token was revoked or isn't valid. Connect again: npx jev-events auth slack");
+    expect(run.stderr).toContain(`✖ ${signedOut} Check SLACK_BOT_TOKEN.`);
     expect(run.code).toBe(1);
-    expect(jev.requests).toEqual([]);
+    expect(existsSync(storeFile())).toBe(false);
   }, 30_000);
 
   it("stops with the fix when Socket Mode is turned off", async () => {
-    connectSlack();
+    await connectSlack();
     const cli = watch("slack");
     await waitFor(() => cli.stdout.includes("connected."), 20_000, "the connection");
     slack.disconnect("link_disabled");
@@ -140,14 +202,14 @@ describe("jev-events watch slack", () => {
 });
 
 describe("jev-events auth slack", () => {
-  it("checks the tokens and saves them", async () => {
+  it("checks the tokens and saves the workspace", async () => {
     const run = await runCli(["auth", "slack", "--token", BOT_TOKEN, "--app-token", APP_TOKEN], { env, cwd });
 
     expect(run.stderr).toBe("");
-    expect(run.stdout).toContain("Connected to Acme as @jev_events. Saved to .jev-events/credentials.json.");
+    expect(run.stdout).toContain("Connected to Acme as @jev_events. Saved to .jev-events/store.json.");
     expect(run.stdout).toContain("It's in #general, #random.");
     expect(run.stdout).toContain("Try it:  npx jev-events watch slack");
-    expect(readCredentials("slack", credentials())).toMatchObject({ token: BOT_TOKEN, appToken: APP_TOKEN, team: "Acme" });
+    expect(await savedConnections()).toMatchObject([{ id: "slack:T0ACME", label: "Acme", credentials: { token: BOT_TOKEN, appToken: APP_TOKEN } }]);
     expect(run.code).toBe(0);
   }, 30_000);
 
@@ -158,7 +220,7 @@ describe("jev-events auth slack", () => {
     expect(run.stderr).toContain("https://api.slack.com/apps?new_app=1&manifest_json=");
     expect(run.stderr).toContain("Then run: npx jev-events auth slack --token <xoxb-…> --app-token <xapp-…>");
     expect(run.code).toBe(1);
-    expect(existsSync(credentials())).toBe(false);
+    expect(existsSync(storeFile())).toBe(false);
   }, 30_000);
 
   it("gives the command that works in this repo under npm run cli", async () => {
@@ -174,6 +236,6 @@ describe("jev-events auth slack", () => {
       `✖ Slack refused the bot token (invalid_auth). Copy the Bot User OAuth Token again from OAuth & Permissions (if it's gone, click "Install to Workspace" there first).\n`,
     );
     expect(run.code).toBe(1);
-    expect(existsSync(credentials())).toBe(false);
+    expect(existsSync(storeFile())).toBe(false);
   }, 30_000);
 });

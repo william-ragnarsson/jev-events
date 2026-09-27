@@ -1,0 +1,47 @@
+{
+  "name": "@jev-events/microsoft",
+  "version": "0.1.0",
+  "description": "Outlook mail, Outlook Calendar and Microsoft Teams for Jev Events: new mail, events and chat messages as they arrive, plus move, flag, categorize, draft replies, invite responses, replies and reactions.",
+  "type": "module",
+  "license": "MIT",
+  "author": "William Ragnarsson",
+  "homepage": "https://jevevents.dev/docs/integrations/outlook",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/william-popmie/jev-events.git",
+    "directory": "packages/microsoft"
+  },
+  "bugs": {
+    "url": "https://github.com/william-popmie/jev-events/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "keywords": [
+    "jev",
+    "jev-events",
+    "outlook",
+    "microsoft-graph",
+    "microsoft-teams",
+    "email",
+    "calendar",
+    "monitoring"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "jev-events": "^0.1.0"
+  }
+}

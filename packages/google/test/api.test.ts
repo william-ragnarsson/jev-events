@@ -129,9 +129,10 @@ describe("GoogleApi", () => {
     const error = await failure(api().gmail("GET", "/profile"));
 
     expect(error.message).toBe(
-      "Google GET /profile failed (403): Request had insufficient authentication scopes. Sign in again and tick every box on Google's consent screen: npx jev-events auth google",
+      "Google GET /profile failed (403): Request had insufficient authentication scopes. Sign in again and tick every box on Google's consent screen.",
     );
     expect(error.reason).toBe("insufficientPermissions");
+    expect(error.needsSignIn).toBe(true);
     expect(isFatal(error)).toBe(true);
     expect(google.calls("GET /profile")).toHaveLength(1);
   });
