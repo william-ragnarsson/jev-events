@@ -8,6 +8,4 @@ export const site = {
   npm: "https://www.npmjs.com/package/jev-events",
   typesafe: "https://typesafe.ai",
   typesafeDocs: "https://docs.typesafe.ai",
-  /** The live relay behind the landing page feed. Unset: the page plays its recorded replay. */
-  relayUrl: (process.env.NEXT_PUBLIC_RELAY_URL ?? "").replace(/\/$/, ""),
 } as const;

@@ -23,8 +23,7 @@
     "eval": "node --conditions=source --import tsx evals/run.ts",
     "eval:report": "node --conditions=source --import tsx evals/report.ts",
     "eval:record": "node --conditions=source --import tsx evals/record.ts",
-    "site:data": "node --conditions=source --import tsx scripts/site-data.ts",
-    "mock-jev": "node --conditions=source --import tsx scripts/mock-jev.ts"
+    "site:data": "node --conditions=source --import tsx scripts/site-data.ts"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",

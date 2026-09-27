@@ -12,7 +12,7 @@ import { listFromEnv, waitFor } from "./helpers.js";
 const question = noul("Is this worth a look?");
 const client = mockJev(() => ({ question: 0.1 }));
 
-// Big channels that are often live, the same ones the live feed on the website watches.
+// Big channels that are often live.
 const TWITCH_CHANNELS = listFromEnv("SMOKE_TWITCH_CHANNELS", ["kaicenat", "jynxzi", "caseoh_", "xqc", "summit1g", "tarik", "lirik", "shroud"]);
 
 const running: Array<{ stop(): Promise<void> }> = [];

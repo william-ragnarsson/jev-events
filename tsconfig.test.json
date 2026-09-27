@@ -12,8 +12,6 @@
     "packages/*/test/**/*.ts",
     "examples/*/**/*.ts",
     "evals/**/*.ts",
-    "apps/live-relay/src/**/*.ts",
-    "apps/live-relay/test/**/*.ts",
     "scripts/**/*.ts",
     "apps/web/test/**/*.ts",
     "apps/web/snippets/**/*.ts",
