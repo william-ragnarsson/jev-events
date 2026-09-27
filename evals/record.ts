@@ -30,12 +30,16 @@ const controller = new AbortController();
 const limit = Number(values.count);
 let recorded = 0;
 
-await twitchChat(channel).start({
+// The source on its own, without a monitor: nothing is judged, and there's no account or cursor.
+await twitchChat(channel).start?.({
   signal: controller.signal,
   log: silentLogger,
+  connection: undefined,
+  session: undefined,
+  cursor: { get: async () => undefined, set: async () => {} },
   fail: (error) => process.stderr.write(`\n${error instanceof Error ? error.message : String(error)}\n`),
   end: () => {},
-  emit(item) {
+  async emit(item) {
     if (recorded >= limit) return;
     out.write(
       `${JSON.stringify({

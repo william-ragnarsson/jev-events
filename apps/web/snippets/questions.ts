@@ -1,23 +1,26 @@
-import { choice, listen, noul, score } from "jev-events";
+import { choice, monitor, noul, score } from "jev-events";
 import { twitch } from "@jev-events/twitch";
 
-const chat = listen(twitch.chat("mychannel"), {
-  // choice: exactly one label wins.
-  // Events: "kind:question", "kind:hype" and "kind:other".
-  kind: choice("What is this chat message mainly doing?", {
-    question: "Asks the streamer a genuine question",
-    hype: "Cheers, celebrates or reacts with excitement",
-    other: null,
-  }),
-  // noul: the probability that the answer is yes. Event: "spoiler"
-  spoiler: noul("Does this message reveal the ending of Elden Ring?"),
-  // score: a position on your own scale, from 0 to 3 here. Event: "toxicity"
-  toxicity: score("How toxic is this message toward other people?", [
-    "Friendly or neutral",
-    "Rude, but not aimed at anyone",
-    "Insulting or mean toward someone",
-    "Harassment, slurs or threats",
-  ]),
+const chat = monitor({
+  source: twitch.chat(),
+  questions: {
+    // choice: exactly one label wins.
+    // Events: "kind:question", "kind:hype" and "kind:other".
+    kind: choice("What is this chat message mainly doing?", {
+      question: "Asks the streamer a genuine question",
+      hype: "Cheers, celebrates or reacts with excitement",
+      other: null,
+    }),
+    // noul: the probability that the answer is yes. Event: "spoiler"
+    spoiler: noul("Does this message reveal the ending of Elden Ring?"),
+    // score: a position on your own scale, from 0 to 3 here. Event: "toxicity"
+    toxicity: score("How toxic is this message toward other people?", [
+      "Friendly or neutral",
+      "Rude, but not aimed at anyone",
+      "Insulting or mean toward someone",
+      "Harassment, slurs or threats",
+    ]),
+  },
 });
 
 // Every answer rides along, such as the probability of each kind label.

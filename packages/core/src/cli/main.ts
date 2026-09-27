@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 
 import { TypeSafeError } from "@typesafe-ai/sdk";
 
+import { generateKey } from "../store/seal.js";
 import { KEY_URL, loadEnv, readSecret } from "./env.js";
 import { forThisShell, paint } from "./format.js";
 import { UsageError, watch, type WatchFlags } from "./watch.js";
@@ -13,6 +14,7 @@ const HELP = `${paint(["bold", "magenta"], "jev-events")}: watch a stream, ask J
 ${paint("bold", "Usage")}
   jev-events watch <source> [questions] [options]
   jev-events auth <google|slack|twitch>      connect an account once; saved in .jev-events/
+  jev-events key                             a new JEV_EVENTS_KEY, to encrypt the tokens a store saves
 
 ${paint("bold", "Sources")}
   gmail                    new mail in your inbox (after: jev-events auth google)
@@ -89,6 +91,9 @@ async function main(argv: string[]): Promise<void> {
       return watch(target, values as WatchFlags);
     case "auth":
       return auth(target, values);
+    case "key":
+      process.stdout.write(`${generateKey()}\n`);
+      return;
     default:
       throw new UsageError(`Unknown command "${command}". Run jev-events --help.`);
   }

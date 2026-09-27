@@ -91,7 +91,7 @@ export const MORE_NOISE: StreamEvent[] = [
 ];
 
 /** The walkthrough: one calendar invite, from the user connecting Google to Acme telling them. */
-// A sketch of the monitor() API from ADR 0002. The real signature lands with the core refactor.
+// A copy of apps/web/snippets/story.ts, which is type-checked; apps/web/test/story.test.ts keeps them equal.
 export const STORY_CODE = `import { choice, monitor } from "jev-events";
 import { google } from "@jev-events/google";
 

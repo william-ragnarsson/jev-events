@@ -59,7 +59,7 @@ export function loadDataset(path: string): ChatExample[] {
 
 export const hasFlag = (example: ChatExample, flag: Flag) => example.flags?.includes(flag) ?? false;
 
-/** What the listener sees: a Twitch-shaped chat message with neutral author names. */
+/** What a monitor sees: a Twitch-shaped chat message with neutral author names. */
 export function toChatItem(example: ChatExample, index: number): ItemInput {
   const facts = {
     ...(example.firstMessage ? { firstMessage: true } : {}),

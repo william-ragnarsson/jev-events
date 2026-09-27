@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { encryptionKey } from "../src/store/seal.js";
 import { fakeJevServer, type FakeJev } from "./fake-jev.js";
 import { liveCli, runCli } from "./run-cli.js";
 
@@ -201,5 +202,13 @@ describe("jev-events errors and help", () => {
     expect(run.code).toBe(0);
     expect(run.stdout).toContain("jev-events watch <source>");
     for (const source of ["gmail", "calendar", "slack[:channel]", "twitch:<channel>", "bluesky"]) expect(run.stdout).toContain(source);
+  }, 30_000);
+
+  it("prints a new encryption key for JEV_EVENTS_KEY", async () => {
+    const [first, second] = await Promise.all([runCli(["key"], { env }), runCli(["key"], { env })]);
+    expect(first.code).toBe(0);
+    expect(first.stdout).toMatch(/^[A-Za-z0-9_-]{43}\n$/);
+    expect(second.stdout).not.toBe(first.stdout);
+    expect(encryptionKey(first.stdout.trim())).toEqual(Buffer.from(first.stdout.trim(), "base64url"));
   }, 30_000);
 });

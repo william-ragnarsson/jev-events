@@ -1,4 +1,4 @@
-import { from, listen, noul } from "jev-events";
+import { from, monitor, noul } from "jev-events";
 import { mockJev } from "jev-events/testing";
 import { expect, test } from "vitest";
 
@@ -13,12 +13,11 @@ test("pages someone for outages only", async () => {
   }));
   const paged: string[] = [];
 
-  const logs = listen(
-    from(["GET /health 200", "db: connect ECONNREFUSED 10.0.0.5:5432"]),
+  const logs = monitor({
+    source: from(["GET /health 200", "db: connect ECONNREFUSED 10.0.0.5:5432"]),
     questions,
-    { client: jev },
-  );
-  logs.on("outage", { min: 0.8 }, (e) => {
+    client: jev,
+  }).on("outage", { min: 0.8 }, (e) => {
     paged.push(e.item.text);
   });
 
