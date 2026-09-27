@@ -17,6 +17,9 @@ import { twitchChat } from "../public/twitch.js";
 import { recipes } from "../recipes.js";
 import { from } from "../sources/from.js";
 import { webhook } from "../sources/webhook.js";
+import { fileStore } from "../store/file.js";
+import { memoryStore } from "../store/memory.js";
+import type { Store } from "../store/types.js";
 import type { AnySource, JudgedEvent } from "../types.js";
 import { envOrigin, isIgnored, KEY_URL, readSecret, saveToEnv } from "./env.js";
 import { formatRow, formatSummary, forThisShell, paint } from "./format.js";
@@ -49,6 +52,8 @@ export interface WatchHook {
   questions: Questions;
   /** Printed once the source is connected, e.g. "Showing your 5 latest emails, then new ones as they arrive." */
   connected?: string | ((source: AnySource) => string);
+  /** What `jev-events auth` connects, for "Connect your Google account first". */
+  account?: string;
 }
 
 /** Sources that live in an integration package, and the package that has them. */
@@ -167,6 +172,39 @@ async function ensureApiKey(canPrompt: boolean): Promise<void> {
   process.stdout.write("\n");
 }
 
+/**
+ * Sources of an integration read the accounts `jev-events auth` saved in .jev-events. Say how to add
+ * one when there's none that works, before asking for an API key.
+ */
+async function ensureConnected(integration: string, hook: WatchHook | undefined): Promise<void> {
+  const connections = await fileStore().connections.list({ integration });
+  if (connections.some((connection) => (connection.status ?? "active") === "active")) return;
+  const signIn = `npx jev-events auth ${integration}`;
+  const stuck = connections.at(-1);
+  if (!stuck) throw new Error(`Connect ${hook?.account ?? `a ${integration} account`} first: ${signIn}`);
+  const problem = stuck.problem ? `\n  ${stuck.problem[0]?.toUpperCase()}${stuck.problem.slice(1)}${/[.!?)]$/.test(stuck.problem) ? "" : "."}` : "";
+  throw new Error(`${stuck.label ?? stuck.id} needs a new sign-in: ${signIn}${problem}`);
+}
+
+/**
+ * Where a watch keeps its state: in memory, so every watch starts fresh instead of catching up on
+ * everything since the last one. Connections, and tokens renewed while watching, are saved in
+ * .jev-events.
+ */
+function watchStore(): Store {
+  const state = memoryStore();
+  const saved = fileStore();
+  return {
+    get: (key) => state.get(key),
+    set: (key, value, options) => state.set(key, value, options),
+    delete: (key) => state.delete(key),
+    claim: (key, options) => state.claim(key, options),
+    add: (key, amount, options) => state.add(key, amount, options),
+    connections: saved.connections,
+    flush: async () => saved.flush?.(),
+  };
+}
+
 export async function watch(sourceSpec: string | undefined, flags: WatchFlags): Promise<void> {
   if (!sourceSpec) throw new UsageError("Name a source, e.g. jev-events watch gmail");
   const { kind, target } = parseSourceSpec(sourceSpec);
@@ -176,6 +214,7 @@ export async function watch(sourceSpec: string | undefined, flags: WatchFlags): 
   const filter = flags.filter ? new RegExp(flags.filter, "i") : undefined;
   // Before the key prompt, so "connect your account first" comes before being asked for a key.
   const source = await resolveSource(kind, target, flags, hook);
+  if (source.integration) await ensureConnected(source.integration, hook);
   await ensureApiKey(kind !== "stdin" && Boolean(process.stdin.isTTY && process.stdout.isTTY));
   const client = new TypeSafeClient();
 
@@ -214,11 +253,17 @@ export async function watch(sourceSpec: string | undefined, flags: WatchFlags): 
       );
       process.exit(2);
     }
-    const message = forThisShell(event.error instanceof Error ? event.error.message : String(event.error));
+    const reason = event.error instanceof Error ? event.error.message : String(event.error);
+    const signIn = event.needsSignIn && source.integration ? ` Sign in again: npx jev-events auth ${source.integration}` : "";
+    const message = forThisShell(`${reason}${signIn}`);
     if (event.fatal) {
-      // The source stopped, such as when the account was disconnected; say why and stop too.
+      // The source stopped, such as when the account was signed out; say why, and once no account
+      // is left, stop too. Stopping first saves that the account needs a new sign-in.
       process.stderr.write(`${paint("red", "✖")} ${message}\n`);
-      process.exit(1);
+      setImmediate(() => {
+        if (watching.stats().running === 0) void watching.stop().finally(() => process.exit(1));
+      });
+      return;
     }
     process.stderr.write(`${paint("red", `${event.phase} error:`)} ${message}\n`);
   });
@@ -250,7 +295,7 @@ export async function watch(sourceSpec: string | undefined, flags: WatchFlags): 
     if (!flags.json) process.stdout.write(`\n${formatSummary(stats)}\n`);
     return;
   }
-  await watching.start();
+  await watching.start(source.integration ? { store: watchStore() } : {});
   if (flags.json) return;
   if (hook) {
     const connected = typeof hook.connected === "function" ? hook.connected(source) : hook.connected;

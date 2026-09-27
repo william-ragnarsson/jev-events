@@ -1,12 +1,12 @@
-import { toMs, type Duration, type Source, type SourceContext } from "jev-events";
+import type { ConnectedSource, SourceContext } from "jev-events";
 
-import { GoogleApi, GoogleApiError, isFatal } from "../api.js";
-import type { GoogleAuth } from "../auth.js";
-import { poll } from "../poll.js";
+import { GoogleApiError, isFatal, type GoogleApi } from "../api.js";
 import { People, protectedBecause, type Person, type ProtectOptions } from "../protect.js";
+import { addressOf, connectedApi, connectionOf } from "../session.js";
 import { describeEmail, gmailItem, type GmailItem } from "./item.js";
 import { header, parseAddresses, type GmailMessage } from "./message.js";
 
+/** What the Gmail source and its actions use for one connection. */
 export interface GmailSession {
   api: GoogleApi;
   /** The signed-in address. */
@@ -14,17 +14,10 @@ export interface GmailSession {
   people: People;
 }
 
-export interface GmailSource extends Source<GmailItem, "gmail"> {
-  /** Set once the source has started. Actions use it. */
-  readonly session: GmailSession | undefined;
-}
+export type GmailSource = ConnectedSource<GmailItem, "gmail", GmailSession>;
 
 export interface InboxOptions {
-  /** The signed-in account, e.g. `google.auth.fromFile()`. */
-  auth: GoogleAuth;
-  /** How often to check for new mail. Default "15s". */
-  every?: Duration;
-  /** Also emit this many of the latest emails already there when starting. Default 0. */
+  /** Also emit this many of the latest emails already there on the first check. Default 0. */
   backfill?: number;
   /**
    * Who native actions never touch. Default: colleagues at your company and people you've emailed
@@ -34,6 +27,12 @@ export interface InboxOptions {
   /** Watch another label instead of the inbox. Default "INBOX". */
   label?: string;
 }
+
+/** Where the last check left off: Gmail's history ID, and the emails backfilled on the first check. */
+export type GmailCursor = {
+  historyId: string;
+  backfilled?: string[];
+};
 
 interface Profile {
   emailAddress: string;
@@ -48,110 +47,118 @@ interface HistoryPage {
 
 /** Labels whose mail is never emitted, even when it also carries the watched label. */
 const SKIPPED_LABELS = ["SPAM", "TRASH", "DRAFT", "CHAT"];
-const SEEN_LIMIT = 2_000;
 
-/** New mail arriving in the inbox, checked every 15 seconds through Gmail's history. */
-export function inbox(options: InboxOptions): GmailSource {
+/**
+ * New mail arriving in each connected account's inbox, read from Gmail's history every 15 seconds
+ * by default. The first check starts from now, plus `backfill` recent emails.
+ */
+export function inbox(options: InboxOptions = {}): GmailSource {
   const label = options.label ?? "INBOX";
-  let session: GmailSession | undefined;
+  const id = `gmail:${label.toLowerCase()}`;
   return {
-    id: `gmail:${label.toLowerCase()}`,
+    id,
     platform: "gmail",
     noun: "email",
     canAct: true,
+    integration: "google",
+    defaults: { every: "15s" },
     describe: describeEmail,
     isProtected: (item) => item.protectedBecause ?? false,
-    get session() {
-      return session;
+    async session(ctx) {
+      const connection = connectionOf(ctx, id);
+      const api = connectedApi(ctx, connection);
+      const me = await addressOf(connection, async () => (await api.gmail<Profile>("GET", "/profile")).emailAddress);
+      return { api, me, people: new People(api, me) };
     },
-    async start(ctx) {
-      const api = new GoogleApi(options.auth);
-      const profile = await api.gmail<Profile>("GET", "/profile");
-      session = { api, me: profile.emailAddress.toLowerCase(), people: new People(api, profile.emailAddress) };
-      pollHistory(ctx, session, profile.historyId, { ...options, label });
+    async check(ctx) {
+      const cursor = await ctx.cursor.get<GmailCursor>();
+      if (cursor) await readHistory(ctx, cursor, label, options.protect);
+      else await begin(ctx, label, options);
     },
   };
 }
 
-/** Check Gmail's history for added messages on a timer, emitting each new one once. */
-function pollHistory(ctx: SourceContext<GmailItem>, session: GmailSession, historyId: string, options: InboxOptions & { label: string }): void {
-  const { api } = session;
-  const seen = new Set<string>();
-  let cursor = historyId;
-
-  const remember = (id: string): boolean => {
-    if (seen.has(id)) return false;
-    seen.add(id);
-    if (seen.size > SEEN_LIMIT) seen.delete(seen.values().next().value as string);
-    return true;
-  };
-
-  const emit = async (id: string) => {
-    try {
-      const message = await api.gmail<GmailMessage>("GET", `/messages/${id}`, { query: { format: "full" } });
-      const labels = message.labelIds ?? [];
-      if (!labels.includes(options.label) || labels.some((l) => SKIPPED_LABELS.includes(l))) return;
-      if (ctx.signal.aborted) return;
-      ctx.emit(await toItem(message, session, options.protect, ctx));
-    } catch (error) {
-      if (error instanceof GoogleApiError && error.status === 404) return; // deleted before we got to it
-      if (isFatal(error)) throw error;
-      ctx.fail(error);
-    }
-  };
-
-  const backfill = async (count: number) => {
+/** The first check: remember where the history is now, and emit the latest few emails. */
+async function begin(ctx: SourceContext<GmailItem, GmailSession>, label: string, options: InboxOptions): Promise<void> {
+  const { api } = ctx.session;
+  const { historyId } = await api.gmail<Profile>("GET", "/profile");
+  const backfilled: string[] = [];
+  if (options.backfill) {
     const list = await api.gmail<{ messages?: Array<{ id: string }> }>("GET", "/messages", {
-      query: { labelIds: options.label, maxResults: count },
+      query: { labelIds: label, maxResults: options.backfill },
     });
     for (const { id } of (list.messages ?? []).reverse()) {
-      if (remember(id)) await emit(id);
-    }
-  };
-
-  const checkHistory = async () => {
-    const added: string[] = [];
-    let latest = cursor;
-    let pageToken: string | undefined;
-    do {
-      let page: HistoryPage;
-      try {
-        page = await api.gmail<HistoryPage>("GET", "/history", {
-          query: { startHistoryId: cursor, historyTypes: "messageAdded", labelId: options.label, pageToken },
-        });
-      } catch (error) {
-        if (!(error instanceof GoogleApiError && error.status === 404)) throw error;
-        // Gmail keeps about a week of history. After a long pause, start over from now.
-        ctx.log.warn("Gmail's history cursor expired, so mail that arrived while paused is skipped.");
-        cursor = (await api.gmail<Profile>("GET", "/profile")).historyId;
-        return;
-      }
-      for (const record of page.history ?? []) {
-        for (const { message } of record.messagesAdded ?? []) added.push(message.id);
-      }
-      if (page.historyId) latest = page.historyId;
-      pageToken = page.nextPageToken;
-    } while (pageToken);
-    for (const id of added) {
       if (ctx.signal.aborted) return;
-      if (remember(id)) await emit(id);
+      await emit(ctx, id, label, options.protect);
+      backfilled.push(id);
     }
-    cursor = latest;
-  };
-
-  poll(ctx, toMs(options.every ?? "15s"), async (first) => {
-    if (first && options.backfill) await backfill(options.backfill);
-    await checkHistory();
-  });
+  }
+  await ctx.cursor.set({ historyId, ...(backfilled.length > 0 ? { backfilled } : {}) } satisfies GmailCursor);
 }
 
-async function toItem(message: GmailMessage, session: GmailSession, protect: ProtectOptions | false | undefined, ctx: SourceContext<GmailItem>): Promise<GmailItem> {
+/** Emit the mail added to the label since the cursor. */
+async function readHistory(
+  ctx: SourceContext<GmailItem, GmailSession>,
+  cursor: GmailCursor,
+  label: string,
+  protect: ProtectOptions | false | undefined,
+): Promise<void> {
+  const { api } = ctx.session;
+  const added: string[] = [];
+  let latest = cursor.historyId;
+  let pageToken: string | undefined;
+  do {
+    let page: HistoryPage;
+    try {
+      page = await api.gmail<HistoryPage>("GET", "/history", {
+        query: { startHistoryId: cursor.historyId, historyTypes: "messageAdded", labelId: label, pageToken },
+      });
+    } catch (error) {
+      if (!(error instanceof GoogleApiError && error.status === 404)) throw error;
+      // Gmail keeps about a week of history. After a long pause, start over from now.
+      ctx.log.warn("Gmail's history cursor expired, so mail that arrived while paused is skipped.");
+      const { historyId } = await api.gmail<Profile>("GET", "/profile");
+      await ctx.cursor.set({ historyId } satisfies GmailCursor);
+      return;
+    }
+    for (const record of page.history ?? []) {
+      for (const { message } of record.messagesAdded ?? []) added.push(message.id);
+    }
+    if (page.historyId) latest = page.historyId;
+    pageToken = page.nextPageToken;
+  } while (pageToken);
+
+  const skip = new Set(cursor.backfilled);
+  for (const id of new Set(added)) {
+    if (ctx.signal.aborted) return;
+    if (!skip.has(id)) await emit(ctx, id, label, protect);
+  }
+  await ctx.cursor.set({ historyId: latest } satisfies GmailCursor);
+}
+
+/** Fetch one email and emit it, unless it has left the label or is spam, trash or a draft. */
+async function emit(ctx: SourceContext<GmailItem, GmailSession>, id: string, label: string, protect: ProtectOptions | false | undefined): Promise<void> {
+  try {
+    const message = await ctx.session.api.gmail<GmailMessage>("GET", `/messages/${id}`, { query: { format: "full" } });
+    const labels = message.labelIds ?? [];
+    if (!labels.includes(label) || labels.some((l) => SKIPPED_LABELS.includes(l))) return;
+    if (ctx.signal.aborted) return;
+    await ctx.emit(await toItem(message, ctx, protect));
+  } catch (error) {
+    if (error instanceof GoogleApiError && error.status === 404) return; // deleted before we got to it
+    if (isFatal(error)) throw error;
+    ctx.fail(error);
+  }
+}
+
+async function toItem(message: GmailMessage, ctx: SourceContext<GmailItem, GmailSession>, protect: ProtectOptions | false | undefined): Promise<GmailItem> {
+  const { me, people } = ctx.session;
   const from = parseAddresses(header(message.payload, "From"))[0];
   let sender: Person | undefined;
   let reason: string | undefined;
   if (from) {
     try {
-      sender = await session.people.about(from.address);
+      sender = await people.about(from.address);
       reason = protectedBecause(sender, protect);
     } catch (error) {
       // Can't tell whether you know them, so play safe: judge it, but don't act on it.
@@ -159,5 +166,5 @@ async function toItem(message: GmailMessage, session: GmailSession, protect: Pro
       reason = protect === false ? undefined : "couldn't check your Sent folder";
     }
   }
-  return gmailItem(message, { me: session.me, ...(sender ? { sender } : {}), ...(reason ? { protectedBecause: reason } : {}) });
+  return gmailItem(message, { me, ...(sender ? { sender } : {}), ...(reason ? { protectedBecause: reason } : {}) });
 }

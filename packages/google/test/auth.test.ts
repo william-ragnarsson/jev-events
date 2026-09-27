@@ -1,13 +1,10 @@
-import { mkdtempSync, realpathSync, writeFileSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
-import { fromEnv, fromFile, GoogleAuthError, withTokens, type GoogleTokens } from "@jev-events/google";
-import { readCredentials, writeCredentials } from "jev-events";
+import { connectedApi, fromEnv, google as googleIntegration, GoogleAuthError, inbox, withTokens, type GoogleTokens } from "@jev-events/google";
+import { toConnection, type App, type Connection, type Credentials, type SessionContext } from "jev-events";
 
 import { fakeGoogle, type FakeGoogle } from "./fake-google.js";
+import { checker } from "./helpers.js";
 
 let google: FakeGoogle;
 
@@ -16,16 +13,11 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await google.close();
 });
 
-/** A credentials file in a fresh temporary folder. */
-function credentialsPath(): string {
-  return join(realpathSync(mkdtempSync(join(tmpdir(), "jev-google-"))), ".jev-events", "credentials.json");
-}
-
-const SIGNED_OUT =
-  "Google signed you out: the sign-in expired or was revoked. Sign in again: npx jev-events auth google (apps in Testing mode are signed out after 7 days)";
+const SIGNED_OUT = "Google signed this account out: the sign-in expired or was revoked (apps in Testing mode are signed out after 7 days).";
 
 describe("withTokens", () => {
   it("uses a fresh access token without asking Google", async () => {
@@ -40,7 +32,7 @@ describe("withTokens", () => {
 
   it("refreshes a token that expires within a minute, and hands the new tokens to onRefresh", async () => {
     const refreshed: GoogleTokens[] = [];
-    const auth = withTokens({ ...google.tokens(), expiresAt: Date.now() + 30_000 }, (tokens) => refreshed.push(tokens));
+    const auth = withTokens({ ...google.tokens(), expiresAt: Date.now() + 30_000 }, (tokens) => void refreshed.push(tokens));
 
     expect(await auth.token()).toBe("access-2");
     expect(google.calls("POST /token")[0]?.body).toEqual({
@@ -88,7 +80,7 @@ describe("withTokens", () => {
     expect(await auth.token()).toBe("access-1");
     const error = await auth.refresh().catch((error: unknown) => error);
     expect(error).toBeInstanceOf(GoogleAuthError);
-    expect((error as Error).message).toBe("The Google sign-in expired and there's no refresh token. Sign in again: npx jev-events auth google");
+    expect((error as Error).message).toBe("The Google sign-in expired and there's no refresh token to renew it.");
     expect(google.requests).toEqual([]);
   });
 
@@ -115,18 +107,24 @@ describe("withTokens", () => {
 });
 
 describe("fromEnv", () => {
-  it("reads the client and refresh token", async () => {
-    const auth = fromEnv({ GOOGLE_CLIENT_ID: "client-1", GOOGLE_CLIENT_SECRET: "secret-1", GOOGLE_REFRESH_TOKEN: "refresh-1" });
+  it("builds a connection from the client and refresh token, which sources can read", async () => {
+    google.deliver({ from: "Ann Smith <ann@example.com>", subject: "Lunch?", text: "Friday at 12?" });
+    const connection = fromEnv({ GOOGLE_CLIENT_ID: "client-1", GOOGLE_CLIENT_SECRET: "secret-1", GOOGLE_REFRESH_TOKEN: "refresh-1" });
+    const run = checker(inbox({ backfill: 1 }), { connection });
 
-    expect(auth.clientId).toBe("client-1");
-    expect(await auth.token()).toBe("access-1");
+    await run.check();
+
+    expect(connection).toMatchObject({ id: "google:env", integration: "google", label: "GOOGLE_REFRESH_TOKEN", status: "active" });
+    expect(connection.credentials).toEqual({ clientId: "client-1", clientSecret: "secret-1", refreshToken: "refresh-1" });
+    expect(run.items.map((item) => item.subject)).toEqual(["Lunch?"]);
+    expect(run.saved.at(-1)?.accessToken).toMatch(/^access-/);
+    expect(googleIntegration.fromEnv).toBe(fromEnv);
   });
 
-  it("accepts an access token on its own", async () => {
-    const auth = fromEnv({ GOOGLE_CLIENT_ID: "client-1", GOOGLE_ACCESS_TOKEN: "access-from-env" });
+  it("accepts an access token on its own", () => {
+    const connection = fromEnv({ GOOGLE_CLIENT_ID: "client-1", GOOGLE_ACCESS_TOKEN: "access-from-env" });
 
-    expect(await auth.token()).toBe("access-from-env");
-    expect(google.requests).toEqual([]);
+    expect(connection.credentials).toEqual({ clientId: "client-1", accessToken: "access-from-env" });
   });
 
   it("says which variables to set", () => {
@@ -137,47 +135,97 @@ describe("fromEnv", () => {
   });
 });
 
-describe("fromFile", () => {
-  const CONNECT_FIRST = "Connect your Google account first: npx jev-events auth google";
+describe("connectedApi", () => {
+  /** A session context for `connection` that records the credentials it saves. */
+  function sessionFor(connection: Connection, options: { app?: App; save?: (credentials: Credentials) => Promise<void> } = {}) {
+    const saved: Credentials[] = [];
+    const warnings: unknown[][] = [];
+    const ctx: SessionContext = {
+      connection,
+      app: options.app,
+      log: { debug: () => {}, info: () => {}, warn: (...args: unknown[]) => void warnings.push(args), error: () => {} },
+      signal: new AbortController().signal,
+      saveCredentials: options.save ?? (async (credentials) => void saved.push(credentials)),
+    };
+    return { ctx, saved, warnings };
+  }
 
-  it("asks you to connect when nothing is saved", () => {
-    const path = credentialsPath();
+  it("calls Google with the connection's token, without renewing a fresh one", async () => {
+    const connection = toConnection("google", google.connection());
+    const { ctx, saved } = sessionFor(connection);
 
-    expect(() => fromFile(path)).toThrow(GoogleAuthError);
-    expect(() => fromFile(path)).toThrow(CONNECT_FIRST);
+    const profile = await connectedApi(ctx, connection).gmail<{ emailAddress: string }>("GET", "/profile");
+
+    expect(profile.emailAddress).toBe("me@acme.com");
+    expect(google.calls("POST /token")).toEqual([]);
+    expect(saved).toEqual([]);
   });
 
-  it("asks you to connect when the saved sign-in has no tokens", () => {
-    const path = credentialsPath();
-    writeCredentials("google", { clientId: "client-1", clientSecret: "secret-1" }, path);
+  it("saves a renewed token back to the connection, keeping the rest of its credentials", async () => {
+    const signedIn = google.connection();
+    const connection = toConnection("google", { ...signedIn, credentials: { ...signedIn.credentials, expiresAt: Date.now() - 1_000, scopes: ["openid"] } });
+    const { ctx, saved } = sessionFor(connection);
 
-    expect(() => fromFile(path)).toThrow(CONNECT_FIRST);
+    await connectedApi(ctx, connection).gmail("GET", "/profile");
+
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ clientId: "client-1", clientSecret: "secret-1", accessToken: "access-2", refreshToken: "refresh-1", scopes: ["openid"] });
+    expect(saved[0]?.expiresAt).toBeGreaterThan(Date.now() + 3_500_000);
   });
 
-  it("says when the file isn't valid JSON", () => {
-    const path = credentialsPath();
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, "{ not json");
+  it("renews with the registered app's client when the connection came from a web sign-in", async () => {
+    const connection = toConnection("google", { account: "me@acme.com", credentials: { refreshToken: "refresh-1", scopes: ["openid"] } });
+    const app = googleIntegration.app({ clientId: "client-1", clientSecret: "secret-1" });
+    const { ctx, saved } = sessionFor(connection, { app });
 
-    expect(() => fromFile(path)).toThrow(`Couldn't read ${path}`);
+    await connectedApi(ctx, connection).gmail("GET", "/profile");
+
+    expect(google.calls("POST /token")[0]?.body).toMatchObject({ client_id: "client-1", client_secret: "secret-1", refresh_token: "refresh-1" });
+    // The app's client isn't copied into the connection.
+    expect(saved[0]).toEqual({ refreshToken: "refresh-1", scopes: ["openid"], accessToken: "access-1", expiresAt: expect.any(Number) });
   });
 
-  it("writes refreshed tokens back, keeping the rest of the file", async () => {
-    const path = credentialsPath();
-    writeCredentials("twitch", { accessToken: "twitch-token" }, path);
-    writeCredentials("google", { ...google.tokens(), expiresAt: Date.now() - 1_000, scopes: ["openid"] }, path);
+  it("falls back to GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET", async () => {
+    vi.stubEnv("GOOGLE_CLIENT_ID", "client-1");
+    vi.stubEnv("GOOGLE_CLIENT_SECRET", "secret-1");
+    const connection = toConnection("google", { account: "me@acme.com", credentials: { refreshToken: "refresh-1" } });
+    const { ctx } = sessionFor(connection);
 
-    const auth = fromFile(path);
-    expect(auth.email).toBe("me@acme.com");
-    expect(await auth.token()).toBe("access-2");
+    await connectedApi(ctx, connection).gmail("GET", "/profile");
 
-    const saved = readCredentials<GoogleTokens>("google", path);
-    expect(saved).toMatchObject({ clientId: "client-1", accessToken: "access-2", refreshToken: "refresh-1", email: "me@acme.com", scopes: ["openid"] });
-    expect(saved?.expiresAt).toBeGreaterThan(Date.now());
-    expect(readCredentials("twitch", path)).toEqual({ accessToken: "twitch-token" });
+    expect(google.calls("POST /token")[0]?.body).toMatchObject({ client_id: "client-1", client_secret: "secret-1" });
+  });
 
-    // The next run reads the refreshed token and doesn't refresh again.
-    expect(await fromFile(path).token()).toBe("access-2");
-    expect(google.calls("POST /token")).toHaveLength(1);
+  it("says where to set the client when there's none to renew with", () => {
+    vi.stubEnv("GOOGLE_CLIENT_ID", "");
+    const connection = toConnection("google", { account: "me@acme.com", credentials: { refreshToken: "refresh-1" } });
+    const { ctx } = sessionFor(connection);
+
+    expect(() => connectedApi(ctx, connection)).toThrow(
+      "Google needs your OAuth client to renew this account's token: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or pass runtime({ apps: [google.app({ clientId, clientSecret })] }).",
+    );
+  });
+
+  it("asks for a new sign-in when the connection has no tokens", () => {
+    const connection = toConnection("google", { account: "me@acme.com", credentials: { clientId: "client-1" } });
+    const { ctx } = sessionFor(connection);
+
+    expect(() => connectedApi(ctx, connection)).toThrow(GoogleAuthError);
+    expect(() => connectedApi(ctx, connection)).toThrow("The Google connection me@acme.com has no tokens. Sign in again.");
+  });
+
+  it("keeps going with the renewed token when saving it fails", async () => {
+    const signedIn = google.connection();
+    const connection = toConnection("google", { ...signedIn, credentials: { ...signedIn.credentials, expiresAt: Date.now() - 1_000 } });
+    const { ctx, warnings } = sessionFor(connection, {
+      save: async () => {
+        throw new Error("database is down");
+      },
+    });
+
+    const profile = await connectedApi(ctx, connection).gmail<{ emailAddress: string }>("GET", "/profile");
+
+    expect(profile.emailAddress).toBe("me@acme.com");
+    expect(warnings).toEqual([["Couldn't save the renewed Google token:", new Error("database is down")]]);
   });
 });

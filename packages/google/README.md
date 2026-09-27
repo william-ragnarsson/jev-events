@@ -1,7 +1,8 @@
 # @jev-events/google
 
-Gmail and Google Calendar for [Jev Events](https://jevevents.dev). Ask Jev about every new email and
-calendar event, then trash, archive, label or answer invites, in your own account.
+Gmail and Google Calendar for [Jev Events](https://jevevents.dev). Jev reads each new email or
+calendar invite and answers your questions about it; your handlers archive, label, trash or answer
+the invite. It works on your own account, or on your users' accounts once they connect them.
 
 [Google guide](https://jevevents.dev/docs/integrations/google) · [Quickstart](https://jevevents.dev/docs/quickstart) ·
 [GitHub](https://github.com/william-popmie/jev-events)
@@ -10,49 +11,93 @@ calendar event, then trash, archive, label or answer invites, in your own accoun
 npm i jev-events @jev-events/google
 ```
 
+## Try it on your own inbox
+
+```bash
+npx jev-events auth google    # sign in once
+npx jev-events watch gmail    # your latest emails, judged, then new mail as it arrives
+npx jev-events watch calendar # your next events, then new and changed ones
+```
+
+## In code
+
 ```ts
-import { listen, recipes } from "jev-events";
+import { monitor, recipes } from "jev-events";
 import { google } from "@jev-events/google";
 
-// `npx jev-events auth google` signs you in and saves the tokens.
-const auth = google.auth.fromFile();
-
-// The meetings that matter, out of everything on the calendar.
-const calendar = listen(google.calendar.events({ auth }), {
-  important: recipes.calendar.important,
-  likelySales: recipes.calendar.likelySales,
-});
-
-calendar
-  .on("important", { min: 0.8 }, (e) => notify(`Don't miss "${e.item.title}"`))
-  .on("likelySales", { min: 0.9 }, google.calendar.decline({ comment: "Thanks, but I'll pass." }));
-
 // Newsletters out of the inbox, and a label on mail that needs a reply.
-const mail = listen(google.gmail.inbox({ auth }), {
-  kind: recipes.email.kind,
-  needsReply: recipes.email.needsReply,
-});
-
-mail
+const mail = monitor({
+  source: google.gmail.inbox(),
+  questions: { kind: recipes.email.kind, needsReply: recipes.email.needsReply },
+})
   .on("kind:newsletter", { min: 0.9 }, google.gmail.archive())
   .on("needsReply", { min: 0.8 }, google.gmail.label("Needs reply"));
 
-await Promise.all([calendar.start(), mail.start()]); // dry-run until you pass { dryRun: false }
+// Invites you haven't answered: flag the ones that matter, turn down sales pitches.
+const invites = monitor({
+  source: google.calendar.invites(),
+  questions: { important: recipes.calendar.important, likelySales: recipes.calendar.likelySales },
+})
+  .on("important", { min: 0.8 }, (e) => console.log(`Don't miss "${e.item.title}"`))
+  .on("likelySales", { min: 0.9 }, google.calendar.decline({ comment: "Thanks, but I'll pass." }));
+
+// Reads the account `npx jev-events auth google` saved, and checks every 15 and 30 seconds.
+await Promise.all([mail.start(), invites.start()]);
 ```
 
-## Sign in
+Actions are dry-run until you pass `dryRun: false` to `monitor()`: they log what they would do and
+change nothing.
 
-```bash
-npx jev-events auth google
+## For your users
+
+Register your OAuth client with a runtime, mount its handler, and send people to `/connect/google`:
+
+```ts
+// lib/jev.ts
+import { postgresStore, runtime } from "jev-events";
+import { google } from "@jev-events/google";
+
+export const jev = runtime({
+  monitors: [mail, invites],
+  store: postgresStore(pool),
+  apps: [google.app()], // GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET
+  signIn: { user: (request) => yourUserId(request) },
+});
+
+// app/api/jev/[...path]/route.ts
+export const GET = jev.handle;
+export const POST = jev.handle;
 ```
 
-The first time, it walks you through creating your own Google OAuth client in four steps, then opens
-Google's consent page. The tokens are saved to `.jev-events/credentials.json`, which only your user can
-read, and refreshed tokens are written back automatically.
+Create the OAuth client as a "Web application" at
+[console.cloud.google.com/auth/clients](https://console.cloud.google.com/auth/clients/create), with
+`https://<your site>/api/jev/callback/google` as its redirect URI. `google.app({ scopes: ["calendar"] })`
+asks for Calendar only.
 
-On a server, `google.auth.fromEnv()` reads `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and
-`GOOGLE_REFRESH_TOKEN`. If you store tokens yourself, `google.auth.withTokens(tokens, onRefresh)` hands
-you refreshed tokens to save.
+## Sign-in on your machine or server
+
+`npx jev-events auth google` walks you through creating your own OAuth client the first time (four
+steps, about three minutes), then opens Google's consent page. It saves the account to
+`.jev-events/store.json`, which only your user can read and git ignores. Set `JEV_EVENTS_KEY` to
+encrypt the tokens in it. Renewed tokens are saved back automatically.
+
+On a server that watches one account of your own, `google.fromEnv()` builds the connection from
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REFRESH_TOKEN`:
+
+```ts
+await mail.start({ connections: [google.fromEnv()] });
+```
+
+## Sources
+
+| Source | Emits | Checks |
+| --- | --- | --- |
+| `google.gmail.inbox({ backfill?, label?, protect? })` | Each new email in the inbox, or under `label` | every 15s |
+| `google.calendar.events({ calendarId?, backfill?, protect? })` | New events, and events whose details change (not just who's coming) | every 30s |
+| `google.calendar.invites({ calendarId?, backfill?, protect? })` | Invites waiting for your answer, again if they change before you answer | every 30s |
+
+`backfill: 5` also emits the 5 latest emails, or next events, on the first check. Pass `every` to
+`monitor()` to check more or less often.
 
 ## Actions
 
@@ -67,9 +112,12 @@ you refreshed tokens to save.
 | `google.calendar.accept({ comment? })` | Says yes to the invite |
 | `google.calendar.decline({ comment? })` | Says no |
 | `google.calendar.maybe({ comment? })` | Answers maybe |
+| `google.calendar.respond(answer, { comment? })` | `"accepted"`, `"declined"` or `"maybe"`, chosen in code |
 
-Native actions skip mail and invites from people at your company and people you've emailed. Change that
-with the `protect` option. Nothing is ever deleted permanently or sent.
+Actions skip mail and invites from people at your company and people you've emailed before. Change
+who is protected with the source's `protect` option, such as
+`google.gmail.inbox({ protect: { addresses: ["boss@acme.com"], except: ["noreply@acme.com"] } })`.
+Nothing is ever deleted permanently or sent.
 
 ## License
 

@@ -2,9 +2,9 @@ import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { writeCredentials } from "jev-events";
+import { fileStore, toConnection } from "jev-events";
 
 import { fakeJevServer, type FakeJev } from "../../core/test/fake-jev.js";
 import { liveCli, runCli, type LiveCli } from "../../core/test/run-cli.js";
@@ -23,7 +23,14 @@ let live: LiveCli[] = [];
 beforeEach(async () => {
   jev = await fakeJevServer();
   google = await fakeGoogle();
-  env = { TYPESAFE_API_KEY: "test-key", TYPESAFE_BASE_URL: jev.url, GOOGLE_CLIENT_ID: undefined, GOOGLE_CLIENT_SECRET: undefined };
+  vi.stubEnv("JEV_EVENTS_KEY", undefined);
+  env = {
+    TYPESAFE_API_KEY: "test-key",
+    TYPESAFE_BASE_URL: jev.url,
+    GOOGLE_CLIENT_ID: undefined,
+    GOOGLE_CLIENT_SECRET: undefined,
+    JEV_EVENTS_KEY: undefined,
+  };
   // Real path, since macOS's temp folder is behind a symlink.
   cwd = realpathSync(mkdtempSync(join(tmpdir(), "jev-google-cli-")));
 });
@@ -33,11 +40,18 @@ afterEach(async () => {
   live = [];
   await jev.close();
   await google.close();
+  vi.unstubAllEnvs();
   rmSync(cwd, { recursive: true, force: true });
 });
 
+const saved = () => fileStore(join(cwd, ".jev-events"));
+
 /** Save the fake account where `jev-events auth google` saves it. */
-const signIn = () => writeCredentials("google", google.tokens(), join(cwd, ".jev-events", "credentials.json"));
+async function signIn(): Promise<void> {
+  const store = saved();
+  await store.connections.save(toConnection("google", google.connection()));
+  await store.close?.();
+}
 
 function watch(source: string): LiveCli {
   const cli = liveCli(["watch", source], env, cwd);
@@ -49,7 +63,7 @@ const questionsAsked = () => jev.requests.map((request) => Object.keys(request.b
 
 describe("jev-events watch gmail", () => {
   it("judges your latest emails and says new mail comes next", async () => {
-    signIn();
+    await signIn();
     google.deliver({ from: "Ann Smith <ann@example.com>", subject: "Lunch?", text: "Friday at 12?" });
     google.deliver({ from: "Deals <deals@shop.example>", subject: "Sale", text: "50% off everything." });
 
@@ -83,22 +97,27 @@ describe("jev-events watch gmail", () => {
     expect(run.stderr).toBe("✖ Connect your Google account first: npm run cli -- auth google\n");
   }, 30_000);
 
-  it("says so when Google signed you out", async () => {
-    signIn();
+  it("says so when Google signed you out, and remembers it for next time", async () => {
+    await signIn();
     google.expireAccessTokens();
     google.revoke();
 
-    const run = await runCli(["watch", "gmail"], { env, cwd });
+    const first = await runCli(["watch", "gmail"], { env, cwd });
+    const second = await runCli(["watch", "gmail"], { env, cwd });
 
-    expect(run.stderr).toContain("✖ Google signed you out: the sign-in expired or was revoked. Sign in again: npx jev-events auth google");
-    expect(run.code).toBe(1);
+    const signedOut = "Google signed this account out: the sign-in expired or was revoked (apps in Testing mode are signed out after 7 days).";
+    expect(first.stderr).toContain(`✖ ${signedOut} Sign in again: npx jev-events auth google`);
+    expect(first.code).toBe(1);
+    expect(second.stderr).toBe(`✖ me@acme.com needs a new sign-in: npx jev-events auth google\n  ${signedOut}\n`);
+    expect(second.code).toBe(1);
+    expect(await saved().connections.list({ integration: "google" })).toMatchObject([{ status: "needs-sign-in", problem: signedOut }]);
     expect(jev.requests).toEqual([]);
   }, 30_000);
 });
 
 describe("jev-events watch calendar", () => {
   it("judges your next events and says changes come next", async () => {
-    signIn();
+    await signIn();
     google.addEvent({
       summary: "Board meeting",
       organizer: { email: "chair@board.example", displayName: "Chair" },
@@ -118,7 +137,7 @@ describe("jev-events watch calendar", () => {
   }, 30_000);
 
   it("watches another of your calendars with calendar:<id>", async () => {
-    signIn();
+    await signIn();
     const team = "team@group.calendar.google.com";
     google.addCalendar(team, "America/New_York");
     google.addEvent({ summary: "Offsite" }, team);
@@ -135,7 +154,7 @@ describe("jev-events watch calendar", () => {
 
 describe("jev-events auth google", () => {
   it("lists the one-time setup when there's no OAuth client and no terminal to ask in", async () => {
-    // No client in flags, env or saved credentials, and stdin is a pipe, so it can't open a browser.
+    // No client in flags or env, and stdin is a pipe, so it can't open a browser.
     const run = await runCli(["auth", "google"], { env: { ...env, HOME: cwd }, cwd });
 
     expect(run.stderr).toContain("✖ Google needs an OAuth client of your own first (one-time, about 3 minutes):");

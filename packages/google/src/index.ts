@@ -1,6 +1,7 @@
-import { fromEnv, fromFile, withTokens } from "./auth.js";
-import { accept, decline, maybe } from "./calendar/actions.js";
-import { events } from "./calendar/source.js";
+import { app } from "./app.js";
+import { fromEnv } from "./auth.js";
+import { accept, decline, maybe, respond } from "./calendar/actions.js";
+import { events, invites } from "./calendar/source.js";
 import { archive, draftReply, label, markRead, star, trash } from "./gmail/actions.js";
 import { inbox } from "./gmail/source.js";
 
@@ -9,23 +10,30 @@ import { inbox } from "./gmail/source.js";
  *
  * @example
  * ```ts
- * const auth = google.auth.fromFile(); // saved by: npx jev-events auth google
- *
- * const mail = listen(google.gmail.inbox({ auth }), { kind: recipes.email.kind });
+ * const mail = monitor({ source: google.gmail.inbox(), questions: { kind: recipes.email.kind } });
  * mail.on("kind:newsletter", google.gmail.archive());
  *
- * const calendar = listen(google.calendar.events({ auth }), { important: recipes.calendar.important });
- * calendar.on("important", { min: 0.8 }, (event) => notify(event.item.title));
+ * const invites = monitor({ source: google.calendar.invites(), questions: { important: recipes.calendar.important } });
+ * invites.on("important", { min: 0.85 }, google.calendar.respond("accepted"));
+ *
+ * export const jev = runtime({ monitors: [mail, invites], store, apps: [google.app()] });
  * ```
  */
 export const google = {
+  /** Your OAuth client, so users can connect their Google accounts. */
+  app,
+  /** One account of your own from GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_REFRESH_TOKEN. */
+  fromEnv,
   gmail: { inbox, trash, archive, markRead, star, label, draftReply },
-  calendar: { events, accept, decline, maybe },
-  auth: { fromFile, fromEnv, withTokens },
+  calendar: { events, invites, respond, accept, decline, maybe },
 } as const;
 
+export { app, expandScopes, type GoogleApp, type GoogleAppOptions } from "./app.js";
+export { exchangeCode, signInUrl, toNewConnection, type ExchangeOptions, type SignedIn, type SignInUrlOptions } from "./oauth.js";
+export { connectedApi } from "./session.js";
+
 export { archive, draftReply, label, markRead, star, trash } from "./gmail/actions.js";
-export { inbox, type GmailSession, type GmailSource, type InboxOptions } from "./gmail/source.js";
+export { inbox, type GmailCursor, type GmailSession, type GmailSource, type InboxOptions } from "./gmail/source.js";
 export { describeEmail, gmailItem, type GmailCategory, type GmailItem, type GmailItemContext } from "./gmail/item.js";
 export {
   bodyText,
@@ -37,8 +45,8 @@ export {
   type GmailPart,
 } from "./gmail/message.js";
 
-export { accept, decline, maybe, type RespondOptions } from "./calendar/actions.js";
-export { events, type CalendarSession, type CalendarSource, type EventsOptions } from "./calendar/source.js";
+export { accept, decline, maybe, respond, type Answer, type RespondOptions } from "./calendar/actions.js";
+export { events, invites, type CalendarCursor, type CalendarSession, type CalendarSource, type EventsOptions } from "./calendar/source.js";
 export {
   calendarItem,
   describeEvent,
@@ -55,9 +63,9 @@ export {
   CALENDAR_SCOPE,
   DEFAULT_SCOPES,
   fromEnv,
-  fromFile,
   GMAIL_SCOPE,
   GoogleAuthError,
+  SCOPES,
   withTokens,
   type GoogleAuth,
   type GoogleTokens,

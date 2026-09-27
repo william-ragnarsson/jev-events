@@ -6,18 +6,22 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 
-import { DEFAULT_CREDENTIALS_PATH, readCredentials, writeCredentials } from "jev-events";
+import { connectionInfo, fileStore, toConnection, type ConnectionInfo, type Store } from "jev-events";
 
-import { CALENDAR_SCOPE, DEFAULT_SCOPES, GMAIL_SCOPE, type GoogleTokens } from "./auth.js";
-import { endpoints } from "./endpoints.js";
+import { expandScopes } from "./app.js";
+import { CALENDAR_SCOPE, GMAIL_SCOPE } from "./auth.js";
+import { exchangeCode, signInUrl, toNewConnection } from "./oauth.js";
 
 export interface AuthorizeOptions {
-  /** Your OAuth client. Default: the one saved last time, or GOOGLE_CLIENT_ID. */
+  /** Your OAuth client. Default: GOOGLE_CLIENT_ID, else the one saved with your last sign-in. */
   "client-id"?: string;
   "client-secret"?: string;
-  /** Space- or comma-separated scopes. Defaults to DEFAULT_SCOPES. */
+  /** What to ask for, space- or comma-separated: "gmail", "calendar" or scope URLs. Default: Gmail and Calendar. */
   scopes?: string;
-  path?: string;
+  /** The file store to save the connection in. Default ".jev-events", where the CLI and `fileStore()` look. */
+  dir?: string;
+  /** Save the connection in this store instead, such as your Postgres store. */
+  store?: Store;
   /** Where to print instructions. Default stdout. */
   print?: (line: string) => void;
   /** Ask a question and return the answer. Default: the terminal, when there is one. */
@@ -29,8 +33,12 @@ export interface AuthorizeOptions {
 }
 
 export interface GoogleIdentity {
+  /** The account's address, unless it wasn't shared. */
   email: string | undefined;
+  /** What the account allowed. */
   scopes: string[];
+  /** The saved connection, without its tokens. */
+  connection: ConnectionInfo;
 }
 
 interface Client {
@@ -47,83 +55,52 @@ export const SETUP_STEPS = [
 ];
 
 /**
- * Connect a Google account: sign in in the browser, then save the tokens for `fromFile()`.
- * This is what `npx jev-events auth google` runs. The first time, it walks you through creating
- * your own OAuth client.
+ * Connect a Google account from the terminal: sign in in the browser, then save the connection in
+ * the file store, where monitors started without `connections` find it. This is what
+ * `npx jev-events auth google` runs. The first time, it walks you through creating your own OAuth
+ * client, which is saved with the connection so its tokens can be renewed.
  */
 export async function authorize(options: AuthorizeOptions = {}): Promise<GoogleIdentity> {
   const print = options.print ?? ((line: string) => process.stdout.write(`${line}\n`));
-  const path = options.path ?? DEFAULT_CREDENTIALS_PATH;
-  const client = findClient(options, path) ?? (await setUpClient(options, print));
-  const scopes = options.scopes ? options.scopes.split(/[\s,]+/).filter(Boolean) : DEFAULT_SCOPES;
-  const urls = endpoints();
+  const dir = options.dir ?? ".jev-events";
+  const store = options.store ?? fileStore(dir);
+  const client = (await findClient(options, store)) ?? (await setUpClient(options, print));
+  const scopes = expandScopes(["openid", "email", ...(options.scopes ? options.scopes.split(/[\s,]+/).filter(Boolean) : ["gmail", "calendar"])]);
 
-  const verifier = base64url(randomBytes(32));
-  const state = base64url(randomBytes(16));
+  const verifier = randomBytes(32).toString("base64url");
+  const state = randomBytes(16).toString("base64url");
   const callback = await waitForCallback(state, options.timeoutMs ?? 5 * 60_000);
-  const redirectUri = callback.redirectUri;
-  const signIn = new URL(urls.authorize);
-  signIn.search = new URLSearchParams({
-    client_id: client.clientId,
-    redirect_uri: redirectUri,
-    response_type: "code",
-    scope: scopes.join(" "),
-    code_challenge: base64url(createHash("sha256").update(verifier).digest()),
-    code_challenge_method: "S256",
+  const url = signInUrl({
+    clientId: client.clientId,
+    redirectUri: callback.redirectUri,
+    scopes,
+    codeChallenge: createHash("sha256").update(verifier).digest("base64url"),
     state,
-    access_type: "offline",
-    prompt: "consent",
-  }).toString();
+  });
 
   print("");
   print("  Opening Google in your browser. If it doesn't open, go to:");
-  print(`  ${signIn.href}`);
+  print(`  ${url}`);
   print("");
   print("  Google will say it hasn't verified the app. It's your own app, so click Continue,");
   print("  and tick every box so Jev Events can read your mail and calendar.");
-  (options.open ?? openBrowser)(signIn.href);
+  (options.open ?? openBrowser)(url);
 
-  const code = await callback.code;
-  const response = await fetch(urls.token, {
-    method: "POST",
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      code_verifier: verifier,
-      redirect_uri: redirectUri,
-      client_id: client.clientId,
-      ...(client.clientSecret ? { client_secret: client.clientSecret } : {}),
-    }),
-  });
-  const json = (await response.json().catch(() => ({}))) as {
-    access_token?: string;
-    refresh_token?: string;
-    expires_in?: number;
-    scope?: string;
-    id_token?: string;
-    error?: string;
-    error_description?: string;
-  };
-  if (!response.ok || !json.access_token) {
-    const why = json.error_description ?? json.error ?? String(response.status);
-    const hint = json.error === "invalid_client" ? " Check the client ID and secret, or delete them and run this again to set up a new client." : "";
-    throw new Error(`Google refused the sign-in: ${why}.${hint}`);
-  }
-
-  const granted = json.scope ? json.scope.split(" ") : scopes;
-  const email = emailFromIdToken(json.id_token);
-  const tokens: GoogleTokens = {
+  const signedIn = await exchangeCode({
     ...client,
-    accessToken: json.access_token,
-    ...(json.refresh_token ? { refreshToken: json.refresh_token } : {}),
-    ...(json.expires_in ? { expiresAt: Date.now() + json.expires_in * 1000 } : {}),
-    ...(email ? { email } : {}),
-    scopes: granted,
-  };
-  writeCredentials("google", tokens, path);
+    code: await callback.code,
+    codeVerifier: verifier,
+    redirectUri: callback.redirectUri,
+    scopes,
+    invalidClientHint: "Check the client ID and secret, or pass the right ones with --client-id and --client-secret.",
+  });
+  const connection = toConnection("google", toNewConnection(signedIn, client));
+  await store.connections.save(connection);
+  await store.flush?.();
 
+  const granted = signedIn.scopes;
   print("");
-  print(`  Signed in${email ? ` as ${email}` : ""}. Saved to ${path}.`);
+  print(`  Signed in${signedIn.email ? ` as ${signedIn.email}` : ""}.${options.store ? "" : ` Saved to ${join(dir, "store.json")}.`}`);
   const missing = [
     ...(scopes.includes(GMAIL_SCOPE) && !granted.includes(GMAIL_SCOPE) ? ["Gmail"] : []),
     ...(scopes.includes(CALENDAR_SCOPE) && !granted.includes(CALENDAR_SCOPE) ? ["Calendar"] : []),
@@ -131,20 +108,26 @@ export async function authorize(options: AuthorizeOptions = {}): Promise<GoogleI
   if (missing.length > 0) {
     print(`  You didn't allow ${missing.join(" or ")}. To add it, run this again and tick every box.`);
   }
-  if (!json.refresh_token) print("  Google sent no refresh token, so you'll need to sign in again in an hour.");
-  print("");
-  print("  Try it:  npx jev-events watch gmail");
-  print("           npx jev-events watch calendar");
-  return { email, scopes: granted };
+  if (!signedIn.refreshToken) print("  Google sent no refresh token, so you'll need to sign in again in an hour.");
+  const tries = [
+    ...(granted.includes(GMAIL_SCOPE) ? ["npx jev-events watch gmail"] : []),
+    ...(granted.includes(CALENDAR_SCOPE) ? ["npx jev-events watch calendar"] : []),
+  ];
+  if (tries.length > 0) print("");
+  tries.forEach((command, index) => print(`${index === 0 ? "  Try it:  " : "           "}${command}`));
+  return { email: signedIn.email, scopes: granted, connection: connectionInfo(connection) };
 }
 
-/** The client from the flags, GOOGLE_CLIENT_ID, or the last sign-in. */
-function findClient(options: AuthorizeOptions, path: string): Client | undefined {
-  const saved = readCredentials<Partial<GoogleTokens>>("google", path);
-  const clientId = options["client-id"] ?? process.env.GOOGLE_CLIENT_ID ?? saved?.clientId;
+/** The client from the flags, GOOGLE_CLIENT_ID, or the latest sign-in saved in the store. */
+async function findClient(options: AuthorizeOptions, store: Store): Promise<Client | undefined> {
+  const saved = (await store.connections.list({ integration: "google" }))
+    .map((connection) => connection.credentials)
+    .filter((credentials) => typeof credentials.clientId === "string")
+    .at(-1) as Partial<Client> | undefined;
+  const clientId = options["client-id"] ?? (process.env.GOOGLE_CLIENT_ID || undefined) ?? saved?.clientId;
   if (!clientId) return undefined;
   const clientSecret =
-    options["client-secret"] ?? process.env.GOOGLE_CLIENT_SECRET ?? (saved?.clientId === clientId ? saved.clientSecret : undefined);
+    options["client-secret"] ?? (process.env.GOOGLE_CLIENT_SECRET || undefined) ?? (saved?.clientId === clientId ? saved.clientSecret : undefined);
   return { clientId, ...(clientSecret ? { clientSecret } : {}) };
 }
 
@@ -274,18 +257,4 @@ function openBrowser(url: string): void {
   } catch {
     // The link is printed too.
   }
-}
-
-function emailFromIdToken(idToken: string | undefined): string | undefined {
-  const payload = idToken?.split(".")[1];
-  if (!payload) return undefined;
-  try {
-    return (JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { email?: string }).email;
-  } catch {
-    return undefined;
-  }
-}
-
-function base64url(bytes: Buffer): string {
-  return bytes.toString("base64url");
 }

@@ -6,15 +6,20 @@ export interface GoogleRequest {
   body?: unknown;
 }
 
-const TICK_EVERY_BOX = "Sign in again and tick every box on Google's consent screen: npx jev-events auth google";
+const TICK_EVERY_BOX = "Sign in again and tick every box on Google's consent screen.";
 
 interface ErrorBody {
-  error?: { message?: string; status?: string; errors?: Array<{ reason?: string }> };
+  error?: { message?: string; status?: string; errors?: Array<{ reason?: string }>; details?: Array<{ reason?: string }> };
 }
 
 export class GoogleApiError extends Error {
   /** Google's reason, such as "notFound", "rateLimitExceeded" or "insufficientPermissions". */
   readonly reason: string | undefined;
+  /**
+   * True when only a new sign-in fixes it: Google refused a freshly refreshed token, or the
+   * account didn't grant a permission this call needs.
+   */
+  readonly needsSignIn: boolean;
 
   constructor(
     readonly method: string,
@@ -25,12 +30,17 @@ export class GoogleApiError extends Error {
     const error = (body as ErrorBody | undefined)?.error;
     const reason = error?.errors?.[0]?.reason ?? error?.status;
     const detail = error?.message ?? (typeof body === "string" ? body.slice(0, 300) : "");
-    const missingScope = status === 403 && /insufficient/i.test(`${reason} ${detail}`);
+    const missingScope =
+      status === 403 &&
+      (reason === "insufficientPermissions" ||
+        error?.details?.some((d) => d.reason === "ACCESS_TOKEN_SCOPE_INSUFFICIENT") === true ||
+        /insufficient authentication scopes/i.test(detail));
     let message = `Google ${method} ${path} failed (${status})${detail ? `: ${detail}` : ""}`;
     if (missingScope) message = `${message.replace(/\.?$/, ".")} ${TICK_EVERY_BOX}`;
     super(message);
     this.name = "GoogleApiError";
     this.reason = reason;
+    this.needsSignIn = status === 401 || missingScope;
   }
 
   get rateLimited(): boolean {
@@ -38,7 +48,10 @@ export class GoogleApiError extends Error {
   }
 }
 
-/** Errors that will repeat on every poll, so the source should stop: a lost sign-in or a missing permission. */
+/**
+ * Errors that will repeat for every item, so a check should stop rather than skip the item: a
+ * lost sign-in, a missing permission or an API that's turned off.
+ */
 export function isFatal(error: unknown): boolean {
   if (error instanceof GoogleAuthError) return true;
   if (!(error instanceof GoogleApiError)) return false;
