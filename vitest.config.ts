@@ -19,8 +19,8 @@ export default defineConfig({
       "packages/*/test/**/*.test.ts",
       "evals/test/**/*.test.ts",
       "apps/*/test/**/*.test.ts",
-      // The testing example in the docs runs for real, so it can't rot.
-      "apps/web/snippets/testing.ts",
+      // The testing examples in the docs run for real, so they can't rot.
+      "apps/web/snippets/testing*.ts",
     ],
   },
 });

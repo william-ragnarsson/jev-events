@@ -4,8 +4,8 @@ Gmail and Google Calendar for [Jev Events](https://jevevents.dev). Jev reads eac
 calendar invite and answers your questions about it; your handlers archive, label, trash or answer
 the invite. It works on your own account, or on your users' accounts once they connect them.
 
-[Google guide](https://jevevents.dev/docs/integrations/google) · [Quickstart](https://jevevents.dev/docs/quickstart) ·
-[GitHub](https://github.com/william-popmie/jev-events)
+[Gmail guide](https://jevevents.dev/docs/integrations/gmail) · [Calendar guide](https://jevevents.dev/docs/integrations/google-calendar) ·
+[Quickstart](https://jevevents.dev/docs/quickstart) · [GitHub](https://github.com/william-popmie/jev-events)
 
 ```bash
 npm i jev-events @jev-events/google

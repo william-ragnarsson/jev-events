@@ -7,9 +7,13 @@ icon: CookingPot
 Recipes are plain question objects exported as `recipes`. Each asks one narrow judgment and spells out its outcomes, following [TypeSafe's guidance](https://docs.typesafe.ai/primitives). Use them as they are, or copy one and change the wording.
 
 ```ts
-import { listen, recipes } from "jev-events";
+import { monitor, recipes } from "jev-events";
+import { twitch } from "@jev-events/twitch";
 
-listen(source, { kind: recipes.chat.kind, hateful: recipes.chat.hateful });
+const chat = monitor({
+  source: twitch.chat(),
+  questions: { kind: recipes.chat.kind, hateful: recipes.chat.hateful },
+});
 ```
 
 The question id is yours to choose. `{ hate: recipes.chat.hateful }` fires `"hate"` instead of `"hateful"`.
@@ -20,7 +24,7 @@ This page is rendered from the library's source, so it always matches the versio
 
 ## Chat
 
-For Twitch, YouTube Live and Discord.
+For live chat, such as Twitch's.
 
 <RecipeList group="chat" />
 

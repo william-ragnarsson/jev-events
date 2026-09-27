@@ -5,7 +5,9 @@ import defaultMdxComponents from 'fumadocs-ui/mdx';
 import type { MDXComponents } from 'mdx/types';
 
 import dataset from '@/generated/dataset.json';
+import { AgentPrompt } from './docs/agent-prompt';
 import { BenchmarkReport } from './docs/benchmark-report';
+import { Builder } from './docs/builder';
 import { RecipeList } from './docs/recipe-list';
 import { Snippet } from './docs/snippet';
 
@@ -26,6 +28,8 @@ export function getMDXComponents(components?: MDXComponents) {
     RecipeList,
     BenchmarkReport,
     Dataset,
+    Builder,
+    AgentPrompt,
     ...components,
   } satisfies MDXComponents;
 }

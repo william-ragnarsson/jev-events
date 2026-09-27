@@ -20,7 +20,7 @@ Each message carries the right answers for the chat recipes: a `kind` where one 
 
 ## Method
 
-- **One request per message, as the library sends it** (`single`). This is what `listen()` does by default: a named message with its facts, and questions pointed at it.
+- **One request per message, as the library sends it** (`single`). This is what `monitor()` does by default: a named message with its facts, and questions pointed at it.
 - **Bare text** (`plain`). The text alone and the recipes unchanged, to check that the structure helps.
 - **Batched** (`batched-8`). Eight messages in one request with one question per message, to see whether batching costs accuracy.
 

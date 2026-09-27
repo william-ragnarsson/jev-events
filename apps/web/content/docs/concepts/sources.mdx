@@ -1,14 +1,14 @@
 ---
 title: Sources
-description: Where items come from. Use an integration, wrap any async iterable, accept webhooks or write your own in 30 lines.
+description: Where items come from. Use an integration, wrap any async iterable, accept webhooks or write your own.
 icon: Radio
 ---
 
-A source connects to a stream and emits **items**. Every item has the same small shape, whatever the platform:
+A source reads a stream and emits **items**. Every item has the same small shape, whatever the platform:
 
 ```ts
 interface Item {
-  id: string; // unique within its source
+  id: string; // unique within its source and connection
   text: string; // what Jev judges
   author?: { id: string; name: string; roles?: string[] };
   at: Date; // when it was created at its origin
@@ -22,16 +22,30 @@ Integrations add typed fields on top. An email also has `subject`, `from` and `l
 
 ## Built-in sources
 
-| Source | Package | Notes |
+| Source | Package | New items | Guide |
+| --- | --- | --- | --- |
+| `google.gmail.inbox()` | `@jev-events/google` | Checked every 15 seconds | [Gmail](/docs/integrations/gmail) |
+| `google.calendar.invites()`, `google.calendar.events()` | `@jev-events/google` | Checked every 30 seconds | [Google Calendar](/docs/integrations/google-calendar) |
+| `slack.messages()` | `@jev-events/slack` | Streamed, or pushed to your site | [Slack](/docs/integrations/slack) |
+| `twitch.chat()` | `@jev-events/twitch` | Streamed | [Twitch](/docs/integrations/twitch) |
+| `from(iterable, options?)` | `jev-events` | As the iterable yields them | [Anything else](/docs/integrations/custom#from-your-own-code) |
+| `webhook(options?)` | `jev-events` | Pushed as HTTP POSTs | [Anything else](/docs/integrations/custom#over-http) |
+| `bluesky(options?)` | `jev-events/public` | Streamed, with no sign-in | [Anything else](/docs/integrations/custom#public-streams) |
+| `twitchChat(channel)` | `jev-events/public` | Streamed, with no sign-in | [Anything else](/docs/integrations/custom#public-streams) |
+
+An integration's sources read signed-in accounts. On your machine, that's the account you signed in with `npx jev-events auth`. In a web app, it's every account your users connected, and the monitor runs once for each of them. See [For your users](/docs/your-users).
+
+## How items arrive
+
+A source gets new items in one or more of three ways, which decides where its monitor can run:
+
+| Delivery | What the source does | Where it runs |
 | --- | --- | --- |
-| `google.gmail.inbox({ auth })` | `@jev-events/google` | New mail in the inbox. [Guide](/docs/integrations/google) |
-| `google.calendar.events({ auth })` | `@jev-events/google` | New invitations, new events and changes to them. [Guide](/docs/integrations/google) |
-| `slack.messages({ auth })` | `@jev-events/slack` | Messages in the channels and DMs your app is in. [Guide](/docs/integrations/slack) |
-| `twitch.chat(channel, { auth? })` | `@jev-events/twitch` | Read-only without `auth`; can moderate with it. [Guide](/docs/integrations/twitch) |
-| `from(iterable, options?)` | `jev-events` | Any iterable or async iterable of strings or objects |
-| `webhook(options?)` | `jev-events` | Items arrive as HTTP POSTs |
-| `bluesky(options?)` | `jev-events/public` | The public Bluesky firehose, read-only |
-| `twitchChat(channel)` | `jev-events/public` | Anonymous, read-only Twitch chat with no extra package |
+| Check | Asks the platform what's new since last time, every `every` | `monitor.start()`, a worker, or the [cron route](/docs/your-users#the-cron-route) |
+| Stream | Holds a connection open and emits items as they arrive | `monitor.start()` or a [worker](/docs/your-users#a-worker), not a serverless function |
+| Push | Answers the requests the platform posts to your site | The [webhook route](/docs/your-users#webhooks) in a web app, or its own port |
+
+A **cursor** remembers where a source left off for each connection, such as the newest email it saw, so a restart neither misses nor repeats anything. Cursors are kept in the store: `.jev-events/` on your machine, or your database in a web app. An item whose id the monitor already judged for that connection is dropped as a `duplicate`.
 
 ## `from()`
 
@@ -44,21 +58,23 @@ Wrap anything you can iterate: log lines, a queue consumer, rows from a database
     noun: { type: 'string', default: '"item"', description: 'What one item is called in Jev\'s state, e.g. "line" or "ticket".' },
     map: { type: '(value) => ItemInput | null', description: 'Turn each value into an item. Return null to skip it.' },
     recent: { type: 'number', default: '0', description: 'How many preceding items to show Jev as context.' },
-    id: { type: 'string', description: 'A readable name for logs.' },
+    id: { type: 'string', default: '"custom:from"', description: 'The source\'s id, which is also the monitor\'s unless you give it one.' },
   }}
 />
 
-A finite iterable ends the source when it runs out, so `await listener.run()` judges everything and returns the stats. That makes `from()` handy for backfills and [tests](/docs/testing).
+A finite iterable ends the source when it runs out, so `await logs.run()` judges everything and returns the stats. That makes `from()` handy for backfills and [tests](/docs/testing).
 
 ## `webhook()`
 
-Starts a small HTTP server. POST a string, `{ "text": "..." }`, or an array of them:
+Started on its own, it runs a small HTTP server. POST a string, `{ "text": "..." }`, or an array of them:
 
 ```bash
 curl -X POST http://127.0.0.1:8787/ \
   -H "Authorization: Bearer $WEBHOOK_SECRET" \
   -d '{"text": "Your product broke my build again and nobody answers"}'
 ```
+
+It answers `202` with how many items it accepted, `401` without the secret, `400` for a body with no text and `413` for one that's too large. Passed to [`runtime()`](/docs/your-users) in a web app, it opens no port of its own and answers `/api/jev/webhook/<monitor id>` instead.
 
 <TypeTable
   type={{
@@ -68,24 +84,48 @@ curl -X POST http://127.0.0.1:8787/ \
     secret: { type: 'string', description: 'Require Authorization: Bearer <secret>.' },
     map: { type: '(body) => ItemInput | ItemInput[] | null', description: 'Turn a request body into items, for example a GitHub or Stripe payload.' },
     maxBytes: { type: 'number', default: '1 MB', description: 'The largest accepted body.' },
+    id: { type: 'string', default: '"webhook"', description: 'The source\'s id, which is also the monitor\'s unless you give it one.' },
   }}
 />
 
 ## Write your own
 
-A source is a plain object with an `id`, a `platform` and a `start(ctx)` that emits items. `start` resolves once the source is connected and keeps emitting until `ctx.signal` aborts.
+A source is a plain object with an `id`, a `platform`, and at least one way to get items: `check`, `start` or `receive`. This one checks a status page every 5 minutes, and its cursor keeps a restart from judging an update twice:
 
 <Snippet name="source" title="status-page.ts" />
 
 <TypeTable
   type={{
-    id: { type: 'string', required: true, description: 'A readable identifier such as "twitch:chat:mychannel".' },
-    platform: { type: 'string', required: true, description: 'Native actions must match it. This is how a Discord action on a Twitch listener becomes a type error.' },
-    start: { type: '(ctx) => Promise<void> | void', required: true, description: 'Connect and emit with ctx.emit(item). Report problems with ctx.fail(error); call ctx.end() after the last item of a finite source.' },
+    id: { type: 'string', required: true, description: 'A readable identifier such as "status-page:acme". Monitors use it as their id unless you give them one.' },
+    platform: { type: 'string', required: true, description: 'Native actions must match it. This is how a Slack action on a Twitch monitor becomes a type error.' },
+    check: { type: '(ctx) => Promise<void>', description: 'Emit whatever is new since ctx.cursor, save the new cursor with ctx.cursor.set(), and resolve.' },
+    start: { type: '(ctx) => Promise<void> | void', description: 'Connect, resolve once connected, and keep emitting until ctx.signal aborts. Call ctx.end() after the last item of a finite stream.' },
+    receive: { type: '(request, ctx) => Promise<Response>', description: 'Handle a request the platform posts to the webhook route, and emit its items with ctx.emit(connection, item).' },
     noun: { type: 'string', default: '"item"', description: 'What one item is called in Jev\'s state.' },
+    defaults: { type: '{ every?: Duration; maxLagMs?: number; recent?: number }', description: 'Sensible defaults for this kind of stream, such as how often to check. The monitor\'s options win.' },
     canAct: { type: 'boolean', description: 'Whether native actions can run for real. Dry-run works either way.' },
-    defaults: { type: '{ maxLagMs?: number; recent?: number }', description: 'Sensible defaults for this kind of stream. The listener\'s options win.' },
+    integration: { type: 'string', description: 'Read signed-in accounts of this integration, once per connection. Unset, the source is one fixed stream.' },
+    session: { type: '(ctx) => S | Promise<S>', description: 'Build what the source and its actions need for one connection, such as an API client, from ctx.connection.credentials.' },
     describe: { type: '(item) => JsonValue', description: 'The lean view of an item that Jev sees. Defaults to its text, author, roles and facts.' },
-    isProtected: { type: '(item) => boolean | string', description: 'Items from protected people, such as moderators. Native actions never run on them. Return a string, such as "colleague at acme.com", to say why.' },
+    isProtected: { type: '(item, ctx) => boolean | string', description: 'Items from protected people, such as moderators. Native actions never run on them. Return a string, such as "colleague at acme.com", to say why.' },
   }}
 />
+
+`check` and `start` get the same context:
+
+| Field | What it's for |
+| --- | --- |
+| `ctx.emit(item)` | Hand an item to the monitor. It resolves once the item is queued, not judged |
+| `ctx.cursor` | `get()` and `set(value)` where this connection left off. Any JSON value |
+| `ctx.signal` | Aborts when the monitor stops. Stop emitting and clean up |
+| `ctx.fail(error, { fatal? })` | Report a problem as an `error` event. A fatal one also ends this run, and it's started again later |
+| `ctx.end()` | The stream has no more items, so `monitor.run()` can finish |
+| `ctx.connection`, `ctx.session` | The account this run reads, and what `session()` built for it |
+
+An error thrown from `check` becomes an `error` event, and the next check runs as usual.
+
+### Reading signed-in accounts
+
+Set `integration`, and the monitor runs the source once per connection of that integration. `session(ctx)` gets the connection with its credentials and builds an API client from them. When it refreshes a token, `ctx.saveCredentials()` keeps the new one in the store. Throw a `SignInError` when access was revoked for good: the connection is marked `needs-sign-in` until its user signs in again, and the monitor emits an `error` event with `needsSignIn: true`.
+
+To act on what a source reads, `defineAction()` turns a platform API call into a [native action](/docs/concepts/actions#your-own-actions), with dry-run and protected users built in. The Gmail, Slack and Twitch integrations are built from the same pieces, so their code is a good place to start.

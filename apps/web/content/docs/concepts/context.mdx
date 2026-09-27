@@ -31,7 +31,9 @@ Jev only knows what's in the request. For each item, Jev Events builds a small J
 `context.about` adds static facts about the stream to every request, such as the game, the rules, or what counts as a spoiler:
 
 ```ts
-listen(twitch.chat("mychannel"), questions, {
+const chat = monitor({
+  source: twitch.chat(),
+  questions,
   context: {
     recent: 5,
     about: {
@@ -44,12 +46,31 @@ listen(twitch.chat("mychannel"), questions, {
 
 Keep it short: it's sent with every item and you pay for its tokens every time.
 
-## Take full control
+## Say who it's for
 
-Pass `state` to build the state yourself. It receives the item, the recent items and `about`:
+When the monitor reads your users' accounts, the same email can matter to one user and not to another. `profile` adds what your product knows about the person behind each connection, and Jev reads it as context:
 
 ```ts
-listen(from(tickets), questions, {
+const invites = monitor({
+  source: google.calendar.invites(),
+  questions: { important: recipes.calendar.important },
+  profile: async (connection) => {
+    const user = await db.users.find(connection.userId);
+    return { role: user.role, team: user.team, focus: user.currentProject };
+  },
+});
+```
+
+The profile is read when a connection starts and again every 5 minutes while items arrive, so changes in your product reach Jev without a restart. It lands under `profile` in the state, next to the item and `recent`. As with `about`, every token of it is paid for on every item, so send the few facts that change the answer.
+
+## Take full control
+
+Pass `state` to build the state yourself. It receives the item, plus the recent items, `about`, `profile` and the `connection`:
+
+```ts
+const support = monitor({
+  source: from(tickets),
+  questions,
   state: (ticket, { recent }) => ({
     ticket: { subject: ticket.facts?.subject ?? null, body: ticket.text },
     previousTickets: recent.length,
@@ -61,4 +82,4 @@ listen(from(tickets), questions, {
 
 ## Costs
 
-You pay for input tokens only: the state plus your questions, for every item. Context is the lever you control. Every recent message adds its text to every request, and often helps with short, ambiguous messages. Measure the trade-off on your own stream with `listener.stats()`, which reports tokens and estimated spend.
+You pay for input tokens only: the state plus your questions, for every item. Context is the lever you control. Every recent message adds its text to every request, and often helps with short, ambiguous messages. Measure the trade-off on your own stream with `monitor.stats()`, which reports tokens and estimated spend.

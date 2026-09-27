@@ -16,19 +16,23 @@ Until you arm it, the log shows what would have happened:
 
 ## Dry-run until you arm it
 
-Every listener starts with `dryRun: true`. Native actions log what they would do and emit an `action` event with status `dry-run`; nothing reaches the platform. Run it on your real chat for a while, read the log, then pass `dryRun: false`.
+Every monitor starts with `dryRun: true`. Native actions log what they would do and emit an `action` event with status `dry-run`; nothing reaches the platform. Run it on your real chat for a while, read the log, then pass `dryRun: false`.
 
-Arming a listener whose source can't act, such as an anonymous Twitch chat, fails at `start()` with a clear error instead of silently doing nothing.
+Arming a monitor whose source can't act, such as `twitchChat()`, which reads a public chat without signing in, fails at `start()` with a clear error instead of silently doing nothing.
 
 ## Protected users
 
-Native actions never run on items from protected people. For Twitch that's the broadcaster, moderators, VIPs and Twitch staff. For Gmail and Google Calendar it's people at your company and people you've emailed; see [Google](/docs/integrations/google#good-to-know). Add your own rules with `protect`, for example regulars or partner bots:
+Native actions never run on items from protected people. For Twitch that's the broadcaster, moderators, VIPs and Twitch staff. For Gmail and Google Calendar it's people at your company and people you've emailed; see [Gmail](/docs/integrations/gmail#good-to-know). Slack's actions only reply, react and post, so no one is protected there by default. Add your own rules with `protect`, for example regulars or partner bots:
 
 ```ts
-listen(source, questions, {
+const mods = monitor({
+  source: twitch.chat(),
+  questions,
   protect: (item) => regulars.has(item.author.login),
 });
 ```
+
+`protect` also gets the connection, so each of your users can have their own list: `protect: (item, connection) => ...`.
 
 Return a string instead of `true` to say why, such as `"regular"`. The action is reported as `skipped` with that reason, or `protected user`. If `protect` throws, the item is treated as protected.
 
@@ -44,40 +48,48 @@ Give any policy a `review` threshold, and answers between `review` and `min` emi
 
 `budget: { inputTokensPerDay }` stops judging once that many input tokens were spent in the current UTC day. Items that arrive after that are dropped with reason `budget` until the next day starts. Jev's list price is $0.042 per million input tokens, so 20 million tokens is about $0.84 a day.
 
-To cap several listeners together, share one `DailyBudget`:
+When the monitor reads your users' accounts, `perConnection` caps each one, so one busy inbox can't spend everyone's budget:
+
+```ts
+budget: { inputTokensPerDay: 200_000_000, perConnection: { inputTokensPerDay: 2_000_000 } },
+```
+
+Both are counted in the store, so every process that shares it, such as your site and a worker, shares the budget too. To cap several monitors in one process together, share one `DailyBudget` instead:
 
 ```ts
 const budget = new DailyBudget(50_000_000);
-const chat = listen(twitch.chat("mychannel"), chatQuestions, { budget });
-const inbox = listen(webhook(), ticketQuestions, { budget });
+const chat = monitor({ source: twitch.chat(), questions: chatQuestions, budget });
+const tickets = monitor({ source: webhook(), questions: ticketQuestions, budget });
 ```
 
 ## Rate limits and queues
+
+`rate` on `runtime()` limits the requests all its monitors make to Jev together, and `rate` on a monitor inside it caps that monitor's share. A monitor started on its own has a limit of its own, so to run several in one process within Jev's limit, put them in one `runtime()`.
 
 | Option | Default | What it does |
 | --- | --- | --- |
 | `rate.perSecond` | 18 | Sustained requests per second. Jev's published limit is 1,200 a minute. |
 | `rate.burst` | 20 | Requests allowed at once after a quiet spell |
 | `rate.concurrency` | 16 | Requests in flight at once |
-| `maxQueue` | 1000 | Items waiting for a slot. Beyond it the oldest are dropped with reason `overflow`. |
-| `maxLagMs` | per source; 10 s for Twitch | Items that waited longer are dropped with reason `stale` instead of being acted on late |
+| `maxQueue` | 1000 | Items waiting for a slot, per connection. Beyond it the oldest are dropped with reason `overflow`. |
+| `maxLagMs` | 10 s for Twitch chat and Bluesky, none otherwise | Items that waited longer are dropped with reason `stale` instead of being acted on late |
 | `timeoutMs` | the SDK's | Per-attempt timeout for a Jev request |
 
 A timeout for a message from two minutes ago confuses everyone, so for chat it's better to skip than to be late.
 
 ## Floods and filters
 
-`cache: true` reuses the answers for identical text for 60 seconds, so a copy-paste flood costs one request. The cache is keyed on text alone and ignores context. `cache: { ttlMs, max }` tunes it.
+`cache: true` reuses the answers for identical text for 60 seconds, per connection, so a copy-paste flood costs one request. The cache is keyed on text alone and ignores context. `cache: { ttlMs, max }` tunes it.
 
 `filter` skips items before they are judged or cost anything. Twitch chat already skips `!commands` and well-known bots:
 
 ```ts
-listen(source, questions, { filter: (item) => item.text.length > 3 });
+const chat = monitor({ source: twitch.chat(), questions, filter: (item) => item.text.length > 3 });
 ```
 
 ## Audit log
 
-`logTo(path)` appends every judgment, review, action, drop and error to a JSONL file, with probabilities, latency and token usage. Pass `{ includeText: false }` to keep ids and answers only.
+`logTo(path)` appends every judgment, review, action, drop and error to a JSONL file, with probabilities, latency and token usage. Each line names the monitor and the connection. Pass `{ includeText: false }` to keep ids and answers only.
 
 Each record is one line in the file. Here is one, spread out to read:
 
@@ -85,6 +97,8 @@ Each record is one line in the file. Here is one, spread out to read:
 {
   "at": "2026-09-24T18:03:11.482Z",
   "type": "action",
+  "monitor": "twitch:chat",
+  "connection": "twitch:41245072",
   "item": { "id": "b1f…", "author": "viewer_42", "text": "…" },
   "action": "twitch.timeout",
   "description": "timeout viewer_42 for 600s",
@@ -95,4 +109,4 @@ Each record is one line in the file. Here is one, spread out to read:
 
 ## Stats
 
-`listener.stats()` returns counts of items received, judged, cached, queued and dropped by reason, actions by status, errors, p50 and p95 latency, token usage and estimated spend.
+`monitor.stats()` returns counts of items received, judged, cached, queued and dropped by reason, actions by status, errors, the connections it's running for, p50 and p95 latency, token usage and estimated spend. In a web app, `jev.stats()` gives the same for each monitor in the process, by monitor id.

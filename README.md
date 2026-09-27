@@ -90,13 +90,22 @@ npx jev-events watch bluesky            # live Bluesky posts
 npx jev-events watch twitch:<channel>   # any live Twitch chat
 ```
 
-Then your own accounts. Each `auth` runs once and walks you through the setup:
+Then your own accounts. Install the integrations, and each `auth` runs once and walks you through
+the setup:
 
 ```bash
+npm i jev-events @jev-events/google @jev-events/slack @jev-events/twitch
 npx jev-events auth google && npx jev-events watch gmail   # or: watch calendar
 npx jev-events auth slack && npx jev-events watch slack
 npx jev-events auth twitch && npx jev-events watch twitch
 ```
+
+## Set it up with your coding agent
+
+The [docs](https://jevevents.dev/docs) open with a prompt for Claude Code, Cursor or any other coding
+agent. Pick what to watch and what should happen, paste the prompt, and the agent writes the code and
+tells you each step that needs you. Each integration's page also has a builder that writes the code
+for what you pick.
 
 ## Run it for your users
 
@@ -187,18 +196,14 @@ npm run build       # every package into dist/
 npm run cli -- watch bluesky   # the jev-events CLI from source, no build needed
 ```
 
-Run the site with a live feed locally, with no API key. The labels come from a keyword stand-in for Jev
-and mean nothing:
+Run the site, with the docs, at http://localhost:3000:
 
 ```bash
-npm run mock-jev    # stand-in for Jev on :8799
-TYPESAFE_API_KEY=mock TYPESAFE_BASE_URL=http://127.0.0.1:8799 LIVE_CHANNELS=<channel> \
-  npm start -w @jev-events/live-relay
-NEXT_PUBLIC_RELAY_URL=http://localhost:8790 npm run dev -w @jev-events/web
+npm run dev -w @jev-events/web
 ```
 
-The site reads generated data from `apps/web/generated`. After changing a snippet, a recipe or the
-relay source, run `npm run site:data`. A test fails when the generated files are stale.
+The site reads generated data from `apps/web/generated`. After changing a snippet or a recipe, run
+`npm run site:data`. A test fails when the generated files are stale.
 
 ### Benchmarks
 

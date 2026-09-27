@@ -1,0 +1,74 @@
+---
+title: Google Calendar
+description: Judge new invites and events as they arrive, then accept, decline or answer maybe.
+icon: CalendarDays
+---
+
+Jev Events checks the calendar, asks Jev your questions about each new invite or event, and runs what you pick on the answers. Choose below, and the code and the steps to run it fill in.
+
+<Builder integration="calendar" />
+
+## Try it without code
+
+To see what Jev says about your own calendar before writing anything, install the integration, sign in once and watch. It prints an answer for your 5 next events, then for each new or changed one:
+
+```bash
+npm i jev-events @jev-events/google
+npx jev-events auth google
+npx jev-events watch calendar
+```
+
+By default it asks whether each event is important and whether it needs preparing for. Ask your own with `--ask "sales=Is this a sales pitch?"`. See [the CLI](/docs/cli).
+
+## The sources
+
+| Source | Emits |
+| --- | --- |
+| `google.calendar.invites()` | Invites waiting for your answer, and again if they change before you answer |
+| `google.calendar.events()` | New events, and events whose details change. Only a change in who's coming doesn't count. |
+
+Both check every 30 seconds; pass `every: "1m"` to `monitor()` to check less often. They take the same options:
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `calendarId` | `"primary"` | Which calendar. The default is the account's own |
+| `backfill` | `0` | Also emits this many upcoming events on the first check |
+| `protect` | Colleagues and people you've emailed | Whose invites native actions never answer, by organizer. `false` protects no one |
+
+## Actions
+
+| Action | What it does |
+| --- | --- |
+| `google.calendar.accept({ comment? })` | Says yes to the invite. The organizer is told. |
+| `google.calendar.decline({ comment? })` | Says no. The event stays on the calendar, marked declined. |
+| `google.calendar.maybe({ comment? })` | Answers maybe. |
+| `google.calendar.respond(answer, { comment? })` | Answers `"accepted"`, `"declined"` or `"maybe"`, chosen in code. |
+
+`comment` is a note to the organizer, shown with your answer. An answer to a recurring invite covers the whole series. Actions are [dry-run](/docs/concepts/safety) until you pass `dryRun: false` to `monitor()`.
+
+## Events
+
+Handlers receive a `CalendarItem`:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `title`, `description` | `string` | The description as plain text |
+| `start`, `end` | `Date` | For a recurring event, the next occurrence |
+| `organizer` | `{ email, name?, you }` | |
+| `attendees` | `{ email, name?, response, optional }[]` | Rooms are left out |
+| `yourResponse` | `string` | `accepted`, `declined`, `maybe` or `pending` |
+| `meetingLink` | `string` | Meet, Zoom, Teams or another video link |
+| `change` | `string` | `new`, `updated`, or `existing` for backfilled events |
+| `protectedBecause` | `string` | Why native actions skip it, if they do |
+
+Jev sees the title, when it starts and the description, plus facts: how soon it starts, how long it lasts, who organized it and whether they're a colleague, how many people are invited, and your answer so far. Times are worked out in code, so Jev never does date math.
+
+## Good to know
+
+- **Protected by default.** Native actions never answer invites from people at your company, or from people you've emailed before. Change it with `protect: { addresses, except }`, or turn it off with `protect: false`. A skipped action says why, for example `colleague at acme.com`.
+- **One sign-in, Gmail and Calendar.** `google.app()` asks for both. The builder asks only for what its monitor needs, such as `google.app({ scopes: ["calendar"] })`.
+- **A server with one account of your own.** `google.fromEnv()` builds the connection from `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REFRESH_TOKEN`: `await invites.start({ connections: [google.fromEnv()] })`.
+
+<Callout title="Letting other people connect their calendar" type="warn">
+  While your consent screen is in Testing, only the test users you add can connect, and Google signs them out after 7 days. Before anyone else connects, publish the app and have Google verify it.
+</Callout>

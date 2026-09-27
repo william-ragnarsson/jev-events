@@ -5,7 +5,7 @@ icon: Rocket
 ---
 
 <Callout title="No code first?">
-  `npx jev-events watch bluesky` judges live posts in your terminal, with no account needed. `watch gmail`, `watch calendar` and `watch slack` work the same after `auth google` or `auth slack`. See the [CLI](/docs/cli).
+  `npx jev-events watch twitch:<any live channel>` prints what Jev says about each chat message in your terminal, with no Twitch account. `watch gmail`, `watch calendar` and `watch slack` work the same once you install the integration and sign in with `auth google` or `auth slack`. See [the CLI](/docs/cli).
 </Callout>
 
 <Steps>
@@ -13,10 +13,12 @@ icon: Rocket
 
 ### Install
 
-Jev Events needs Node.js 22 or newer.
+Jev Events needs Node.js 22 or newer. Make a folder, and install it with `tsx`, which runs TypeScript:
 
 ```bash
-npm i jev-events @jev-events/twitch
+mkdir my-monitor && cd my-monitor
+npm init -y && npm pkg set type=module
+npm i jev-events tsx
 ```
 
 </Step>
@@ -33,11 +35,11 @@ TYPESAFE_API_KEY=<your key>
 </Step>
 <Step>
 
-### Listen to a chat
+### Write a monitor
 
-Reading a public Twitch chat needs no Twitch account. Pick any channel that is live right now.
+Reading a public Twitch chat needs no Twitch account. Pick any channel that is live right now, and put its name where the code says `some_live_channel`.
 
-<Snippet name="quickstart" title="listener.ts" />
+<Snippet name="quickstart" title="monitor.ts" />
 
 </Step>
 <Step>
@@ -45,43 +47,51 @@ Reading a public Twitch chat needs no Twitch account. Pick any channel that is l
 ### Run it
 
 ```bash
-npx tsx --env-file=.env listener.ts
+npx tsx --env-file=.env monitor.ts
 ```
 
-Questions for the streamer are printed as they arrive. The timeout never happens: native actions start in dry-run, so you'll only see a line like this.
-
-```txt
-[jev-events] [dry-run] would timeout viewer_42 for 600s (hateful p=0.97)
-```
+Questions for the streamer are printed as they arrive, and so are hateful messages Jev is at least 90% sure about. Stop it with Ctrl+C.
 
 </Step>
 <Step>
 
 ### Moderate your own channel
 
-To act for real, sign in a bot account and make it a moderator.
+To act in chat, the monitor has to read it as you. Install the Twitch integration and sign in once:
 
 ```bash
-npx jev-events auth twitch --client-id <your Twitch app's client id>
+npm i @jev-events/twitch
+npx jev-events auth twitch
 ```
 
-Then type `/mod <your bot>` in your chat. Pass the saved sign-in and turn dry-run off:
+The first time, `auth twitch` walks you through registering your own Twitch app, then shows a code to approve on Twitch. The sign-in is saved in `.jev-events/`, which git ignores. Then read your own channel and add a native action:
 
-```ts
-const chat = listen(
-  twitch.chat("mychannel", { auth: twitch.auth.fromFile() }),
-  { kind: recipes.chat.kind, hateful: recipes.chat.hateful },
-  { dryRun: false },
-);
+```ts title="monitor.ts"
+import { monitor, recipes } from "jev-events";
+import { twitch } from "@jev-events/twitch";
+
+const mods = monitor({
+  source: twitch.chat(), // your own channel, as you
+  questions: { hateful: recipes.chat.hateful },
+}).on("hateful", { min: 0.9 }, twitch.timeout({ seconds: 600 }));
+
+await mods.start();
 ```
 
-The [Twitch guide](/docs/integrations/twitch) covers the Twitch app, scopes and every action.
+Run it the same way. Native actions start in dry-run, so the timeout only prints what it would do:
+
+```txt
+[jev-events] [dry-run] would timeout viewer_42 for 600s (hateful p=0.97)
+```
+
+When those lines look right, pass `dryRun: false` to `monitor()`. The [Twitch guide](/docs/integrations/twitch) covers every action, and its builder writes the code for the questions and actions you pick.
 
 </Step>
 </Steps>
 
 ## Next
 
-- [Questions](/docs/concepts/questions): write your own, and choose thresholds.
-- [Safety](/docs/concepts/safety): budgets, rate limits, the review band and the audit log.
+- [For your users](/docs/your-users): run the same monitor for everyone who connects an account to your product.
+- [Questions](/docs/concepts/questions): write your own, and choose how sure Jev has to be.
+- [Safety](/docs/concepts/safety): dry-run, protected users, budgets and the audit log.
 - [Recipes](/docs/recipes): ready-made questions to start from.
