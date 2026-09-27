@@ -18,7 +18,8 @@ ${paint("bold", "Sources")}
   gmail                    new mail in your inbox (after: jev-events auth google)
   calendar                 new and changed events in your Google Calendar (after: jev-events auth google)
   slack[:channel]          messages in channels the Slack app is in (after: jev-events auth slack)
-  twitch:<channel>         any public Twitch chat, no login needed
+  twitch                   chat in your own Twitch channel, as your account (after: jev-events auth twitch)
+  twitch:<channel>         any public Twitch chat, no sign-in needed
   bluesky[:word,word]      the Bluesky firehose, optionally only posts with these words
   stdin                    one item per line: tail -f app.log | jev-events watch stdin -a "..."
   webhook[:port]           POST {"text": "..."} to http://127.0.0.1:8787/

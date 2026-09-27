@@ -70,8 +70,14 @@ const INTEGRATIONS: Record<string, string> = {
   gmail: "@jev-events/google",
   calendar: "@jev-events/google",
   slack: "@jev-events/slack",
+  twitch: "@jev-events/twitch",
 };
 const BUILT_IN = ["twitch", "bluesky", "stdin", "webhook"];
+
+/** Said along with "connect your account first", for sources that can also be watched without an account. */
+const WITHOUT_SIGN_IN: Record<string, string> = {
+  twitch: "Or watch any channel without signing in: npx jev-events watch twitch:<channel>",
+};
 
 const POST_TOPICS = choice("What is this post mainly about?", {
   tech: "Software, AI, science or gadgets",
@@ -86,7 +92,7 @@ const POST_TOPICS = choice("What is this post mainly about?", {
 export function parseSourceSpec(spec: string): { kind: string; target: string } {
   const [kind = "", ...rest] = spec.split(":");
   if (!BUILT_IN.includes(kind) && !INTEGRATIONS[kind]) {
-    throw new UsageError(`Unknown source "${spec}". Try gmail, calendar, slack, twitch:<channel>, bluesky, stdin or webhook.`);
+    throw new UsageError(`Unknown source "${spec}". Try gmail, calendar, slack, twitch, twitch:<channel>, bluesky, stdin or webhook.`);
   }
   return { kind, target: rest.join(":") };
 }
@@ -101,11 +107,16 @@ export async function loadHook(kind: string): Promise<WatchHook | undefined> {
   } catch (error) {
     const missing = (error as NodeJS.ErrnoException).code === "ERR_MODULE_NOT_FOUND" && String(error).includes(name);
     if (!missing) throw error;
-    throw new UsageError(`Install ${name} first: npm i ${name}`);
+    throw new UsageError(`Install ${name} first: npm i ${name}${hint(kind)}`);
   }
   const hook = mod.cli?.[kind];
   if (!hook) throw new UsageError(`${name} doesn't support "jev-events watch ${kind}" yet.`);
   return hook;
+}
+
+function hint(kind: string): string {
+  const other = WITHOUT_SIGN_IN[kind];
+  return other ? `\n  ${other}` : "";
 }
 
 async function resolveSource(kind: string, target: string, flags: WatchFlags, hook: WatchHook | undefined): Promise<AnySource> {
@@ -190,7 +201,7 @@ async function ensureConnected(integration: string, hook: WatchHook | undefined)
   if (connections.some((connection) => (connection.status ?? "active") === "active")) return;
   const signIn = `npx jev-events auth ${integration}`;
   const stuck = connections.at(-1);
-  if (!stuck) throw new Error(`Connect ${hook?.account ?? `a ${integration} account`} first: ${signIn}`);
+  if (!stuck) throw new Error(`Connect ${hook?.account ?? `a ${integration} account`} first: ${signIn}${hint(integration)}`);
   const problem = stuck.problem ? `\n  ${stuck.problem[0]?.toUpperCase()}${stuck.problem.slice(1)}${/[.!?)]$/.test(stuck.problem) ? "" : "."}` : "";
   throw new Error(`${stuck.label ?? stuck.id} needs a new sign-in: ${signIn}${problem}`);
 }
@@ -217,7 +228,8 @@ function watchStore(): Store {
 export async function watch(sourceSpec: string | undefined, flags: WatchFlags): Promise<void> {
   if (!sourceSpec) throw new UsageError("Name a source, e.g. jev-events watch gmail");
   const { kind, target } = parseSourceSpec(sourceSpec);
-  const hook = await loadHook(kind);
+  // twitch:<channel> reads public chat without an account; plain twitch reads yours.
+  const hook = kind === "twitch" && target ? undefined : await loadHook(kind);
   const questions = resolveQuestions(kind, flags, hook?.questions);
   const min = flags.min === undefined ? 0.5 : Number(flags.min);
   const filter = flags.filter ? new RegExp(flags.filter, "i") : undefined;
