@@ -35,3 +35,16 @@ export function QuickstartLink() {
     </Link>
   );
 }
+
+/** The other way in, next to the quickstart: the live Twitch demo at /try. */
+export function TryLink() {
+  return (
+    <Link
+      href="/try"
+      className="inline-flex h-11 items-center gap-2.5 rounded-md border border-[var(--line-2)] px-5 text-[14.5px] font-medium transition-colors hover:bg-white/[0.05]"
+    >
+      <span aria-hidden className="landing-live-dot size-1.5 rounded-full bg-[var(--accent)]" />
+      {COPY.tryIt}
+    </Link>
+  );
+}

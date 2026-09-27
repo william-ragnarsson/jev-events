@@ -19,7 +19,7 @@ export type SourceId =
 export const COPY = {
   headline: 'Ask every event a question.',
   sub: "A developer-first library to have Jev integrated into your users' inbox, calendar, Slack channels and more!",
-  install: 'npm i jev-events',
+  tryIt: 'Try it in your browser',
   quickstart: 'Read the quickstart',
 };
 

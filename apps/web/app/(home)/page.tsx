@@ -14,7 +14,6 @@ export const metadata: Metadata = {
   twitter: { card: 'summary_large_image', title, description },
 };
 
-// The landing page brings its own nav and footer, so this route group has no layout.
 export default function HomePage() {
   return <Landing />;
 }

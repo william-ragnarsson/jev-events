@@ -12,9 +12,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 
 import { BRANDS } from './brands';
 import { COPY, MORE_NOISE, QUESTIONS, STREAM, type SourceId, type StreamEvent } from './content';
-import { InstallCommand } from './install';
 import { copiesFor, lay, offsetFor, Track, useLoop, useWidth, watchCrossings, type Lane } from './loop';
-import { QuickstartLink } from './ui';
+import { QuickstartLink, TryLink } from './ui';
 
 /** Answers between the review and act thresholds (0.6 and 0.85): a person decides. */
 const BORDERLINE: StreamEvent[] = [
@@ -91,9 +90,9 @@ export function Hero() {
           >
             {COPY.sub}
           </p>
-          <div data-hero-fade className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-1" style={{ '--i': 1 } as CSSProperties}>
+          <div data-hero-fade className="mt-8 flex flex-wrap items-center gap-3" style={{ '--i': 1 } as CSSProperties}>
             <QuickstartLink />
-            <InstallCommand />
+            <TryLink />
           </div>
         </div>
         <Console />
