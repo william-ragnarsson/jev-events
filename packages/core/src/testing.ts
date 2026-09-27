@@ -34,7 +34,7 @@ export interface MockJev extends JevClient {
  * @example
  * ```ts
  * const jev = mockJev(({ state }) => ({ hateful: JSON.stringify(state).includes("idiot") ? 0.97 : 0.02 }));
- * listen(from(["hi", "you idiot"]), { hateful: noul("Is this hateful?") }, { client: jev });
+ * monitor({ source: from(["hi", "you idiot"]), questions: { hateful: noul("Is this hateful?") }, client: jev });
  * ```
  */
 export function mockJev(

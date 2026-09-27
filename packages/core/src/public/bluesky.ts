@@ -34,7 +34,7 @@ interface JetstreamEvent {
 
 /**
  * Every new public Bluesky post, from the Jetstream firehose. No login needed. The firehose is
- * busy, so pass `keywords` or `langs`, or let the listener's rate limit sample it.
+ * busy, so pass `keywords` or `langs`, or let the monitor's rate limit sample it.
  */
 export function bluesky(options: BlueskyOptions = {}): Source<BlueskyPostItem, "bluesky"> {
   const keywords = options.keywords?.map((keyword) => keyword.toLowerCase()).filter(Boolean);
@@ -80,7 +80,7 @@ export function bluesky(options: BlueskyOptions = {}): Source<BlueskyPostItem, "
             const lower = text.toLowerCase();
             if (!keywords.some((keyword) => lower.includes(keyword))) return;
           }
-          ctx.emit({
+          void ctx.emit({
             id: `${event.did}/${commit.rkey}`,
             text,
             author: { id: event.did, name: event.did.replace(/^did:plc:/, "").slice(0, 10) },

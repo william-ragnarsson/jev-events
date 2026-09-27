@@ -16,13 +16,15 @@ export interface StateParts<I extends Item> {
   item: I;
   recent: readonly I[];
   about: JsonValue | undefined;
+  /** What the product says about the person behind the connection. */
+  profile?: JsonValue | undefined;
 }
 
 /**
- * Build `{ <noun>: item, recent?: [...], about?: {...} }`. Named keys keep the relationship between
- * the judged item and its context clear to Jev.
+ * Build `{ <noun>: item, recent?: [...], profile?: {...}, about?: {...} }`. Named keys keep the
+ * relationship between the judged item and its context clear to Jev.
  */
-export function buildState<I extends Item>(source: Source<I, string>, parts: StateParts<I>): Record<string, JsonValue> {
+export function buildState<I extends Item>(source: Source<I, string, any>, parts: StateParts<I>): Record<string, JsonValue> {
   const key = source.noun ?? "item";
   const state: Record<string, JsonValue> = {
     [key]: source.describe ? source.describe(parts.item) : describeItem(parts.item),
@@ -30,6 +32,7 @@ export function buildState<I extends Item>(source: Source<I, string>, parts: Sta
   if (parts.recent.length > 0) {
     state.recent = parts.recent.map((r) => ({ author: r.author?.name ?? null, text: r.text }));
   }
+  if (parts.profile !== undefined) state.profile = parts.profile;
   if (parts.about !== undefined) state.about = parts.about;
   return state;
 }

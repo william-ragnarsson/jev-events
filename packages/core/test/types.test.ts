@@ -4,9 +4,12 @@ import {
   burst,
   choice,
   defineAction,
-  listen,
+  monitor,
   noul,
   score,
+  type ConnectedSource,
+  type ConnectionInfo,
+  type DropReason,
   type Item,
   type OutcomeEventName,
   type Source,
@@ -19,11 +22,13 @@ interface ChatItem extends Item {
 }
 
 const twitchLike: Source<ChatItem, "twitch"> = { id: "twitch:chat:x", platform: "twitch", start() {} };
+const inboxLike: ConnectedSource<Item, "google"> = { id: "google:gmail:inbox", platform: "google", integration: "google", async check() {} };
 const questions = {
   kind: choice("What is this?", { question: null, hateful: null, other: null }),
   hateful: noul("Is this hateful?"),
   severity: score("How severe?", ["none", "mild", "severe"]),
 };
+const client = mockJev(() => ({}));
 
 describe("types", () => {
   it("derives outcome event names from the questions", () => {
@@ -33,7 +38,7 @@ describe("types", () => {
   });
 
   it("types handler payloads from the source and the questions", () => {
-    const chat = listen(twitchLike, questions, { client: mockJev(() => ({})) });
+    const chat = monitor({ source: twitchLike, questions, client });
     chat.on("kind:question", (e) => {
       expectTypeOf(e.item).toEqualTypeOf<ChatItem>();
       expectTypeOf(e.item.channel).toBeString();
@@ -45,12 +50,34 @@ describe("types", () => {
       expectTypeOf(e.answers.kind.probabilities.hateful).toBeNumber();
     });
     chat.on("dropped", (e) => {
-      expectTypeOf(e.reason).toEqualTypeOf<"filtered" | "stale" | "overflow" | "budget" | "stopped">();
+      expectTypeOf(e.reason).toEqualTypeOf<DropReason>();
+      expectTypeOf<DropReason>().toEqualTypeOf<"filtered" | "duplicate" | "stale" | "overflow" | "budget" | "stopped">();
+    });
+  });
+
+  it("always has a connection for sources that read signed-in accounts", () => {
+    const inbox = monitor({
+      source: inboxLike,
+      questions,
+      client,
+      profile: (connection) => {
+        expectTypeOf(connection).toEqualTypeOf<ConnectionInfo>();
+        return connection.userId;
+      },
+      protect: (_item, connection) => connection.label?.endsWith("@acme.com") ?? false,
+    });
+    inbox.on("hateful", (e) => {
+      expectTypeOf(e.connection).toEqualTypeOf<ConnectionInfo>();
+    });
+
+    const chat = monitor({ source: twitchLike, questions, client });
+    chat.on("hateful", (e) => {
+      expectTypeOf(e.connection).toEqualTypeOf<ConnectionInfo | undefined>();
     });
   });
 
   it("accepts the right policy for each kind of question", () => {
-    const chat = listen(twitchLike, questions, { client: mockJev(() => ({})) });
+    const chat = monitor({ source: twitchLike, questions, client });
     chat.on("kind:hateful", { min: 0.8, review: 0.5 }, () => {});
     chat.on("severity", { atLeast: 1.5 }, () => {});
     // These also throw at runtime; only their types are under test here.
@@ -66,19 +93,23 @@ describe("types", () => {
   });
 
   it("only accepts native actions for the source's platform", () => {
-    const chat = listen(twitchLike, questions, { client: mockJev(() => ({})) });
+    const chat = monitor({ source: twitchLike, questions, client });
     const timeout = defineAction({ platform: "twitch", name: "twitch.timeout", describe: () => "", run: async () => {} });
     const anywhere = defineAction({ platform: "*", name: "notify", describe: () => "", run: async () => {} });
     const discordDelete = defineAction({ platform: "discord", name: "discord.delete", describe: () => "", run: async () => {} });
 
     chat.on("hateful", timeout);
     chat.on("hateful", anywhere);
-    // @ts-expect-error a Discord action can't run on a Twitch stream
-    chat.on("hateful", discordDelete);
+    // This also throws at runtime; only its type is under test here.
+    const invalid = () => {
+      // @ts-expect-error a Discord action can't run on a Twitch stream
+      chat.on("hateful", discordDelete);
+    };
+    expectTypeOf(invalid).toBeFunction();
   });
 
   it("infers burst events from where the handler is used", () => {
-    const chat = listen(twitchLike, questions, { client: mockJev(() => ({})) });
+    const chat = monitor({ source: twitchLike, questions, client });
     chat.on(
       "hateful",
       burst({ count: 3, within: "30s", distinctBy: (e) => e.item.author?.id }, (b) => {

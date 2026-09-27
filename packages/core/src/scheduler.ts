@@ -59,7 +59,7 @@ export class Percentiles {
 }
 
 /**
- * Input tokens spent per UTC day. Pass one instance as `budget` to several listeners to cap
+ * Input tokens spent per UTC day. Pass one instance as `budget` to several monitors to cap
  * them together, e.g. when a service switches channels.
  */
 export class DailyBudget {

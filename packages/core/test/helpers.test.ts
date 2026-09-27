@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { burst, listen, noul, silentLogger, toMs, webhook, type Item } from "../src/index.js";
+import { burst, memoryStore, monitor, noul, runtime, silentLogger, toMs, webhook, type Item } from "../src/index.js";
 import { mockJev } from "../src/testing.js";
 
 describe("burst", () => {
@@ -48,16 +48,15 @@ describe("toMs", () => {
   });
 });
 
+const spam = noul("Is this spam?");
+
 describe("webhook", () => {
-  it("turns authorized POSTs into items", async () => {
+  it("turns authorized POSTs into items when it runs as a worker", async () => {
     const source = webhook({ port: 0, path: "/in", secret: "s3cret" });
     const items: Item[] = [];
-    const chat = listen(source, { spam: noul("Is this spam?") }, { client: mockJev(() => ({ spam: 0 })), log: silentLogger }).on(
-      "judged",
-      (e) => {
-        items.push(e.item);
-      },
-    );
+    const chat = monitor({ source, questions: { spam }, client: mockJev(() => ({ spam: 0 })), log: silentLogger }).on("judged", (e) => {
+      items.push(e.item);
+    });
     await chat.start();
     const url = source.url as string;
     const post = (body: unknown, token = "s3cret") =>
@@ -86,5 +85,44 @@ describe("webhook", () => {
       ["three", undefined],
       ["[ERROR] db down", undefined],
     ]);
+  });
+
+  it("answers POSTs to /webhook/<monitor id> in a web app", async () => {
+    const items: string[] = [];
+    const alerts = monitor({
+      id: "alerts",
+      source: webhook({ secret: "s3cret" }),
+      questions: { spam },
+      client: mockJev(() => ({ spam: 0 })),
+      log: silentLogger,
+    }).on("judged", (e) => {
+      items.push(e.item.text);
+    });
+    const jev = runtime({ monitors: [alerts], store: memoryStore(), log: silentLogger });
+    const post = (path: string, body: unknown, token = "s3cret") =>
+      jev.handle(
+        new Request(`https://example.com/api/jev${path}`, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify(body),
+        }),
+      );
+
+    expect((await post("/webhook/alerts", { text: "hello" }, "wrong")).status).toBe(401);
+    const accepted = await post("/webhook/alerts", [{ text: "one" }, "two"]);
+    expect(accepted.status).toBe(202);
+    expect(await accepted.json()).toEqual({ accepted: 2 });
+    // Without waitUntil the route judges before it responds.
+    expect(items).toEqual(["one", "two"]);
+
+    const missing = await post("/webhook/nothing", { text: "hello" });
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toEqual({ error: 'No monitor receives webhooks for "nothing".' });
+  });
+
+  it("names itself after its path unless given an id", () => {
+    expect(webhook().id).toBe("webhook");
+    expect(webhook({ path: "/hooks/alerts/" }).id).toBe("webhook-hooks-alerts");
+    expect(webhook({ path: "/in", id: "alerts" }).id).toBe("alerts");
   });
 });

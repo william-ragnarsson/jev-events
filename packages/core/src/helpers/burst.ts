@@ -22,6 +22,9 @@ export interface Burst<E> {
  * Wrap a handler so it runs only when an outcome fires `count` times within a window.
  * Jev judges each message; code does the counting.
  *
+ * The count lives in this process, so use it with live streams in a worker (`start()`), not
+ * with checks from the cron route, where each request starts from zero.
+ *
  * @example
  * ```ts
  * chat.on("streamIssue", burst({ count: 5, within: "30s", distinctBy: (e) => e.item.author?.id },

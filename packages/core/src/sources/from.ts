@@ -59,7 +59,7 @@ export function from<T = ItemInput>(
           for await (const value of values) {
             if (ctx.signal.aborted) return;
             const input = map(value);
-            if (input != null) ctx.emit(toItem(input));
+            if (input != null) await ctx.emit(toItem(input));
           }
           ctx.end();
         } catch (error) {

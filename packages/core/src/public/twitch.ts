@@ -177,7 +177,7 @@ export function twitchChat(channel: string, options: TwitchPublicChatOptions = {
                 break;
               case "PRIVMSG": {
                 const item = itemFromIrc(message);
-                if (item && !ignoredChat(item, options.ignore)) ctx.emit(item);
+                if (item && !ignoredChat(item, options.ignore)) void ctx.emit(item);
                 break;
               }
             }

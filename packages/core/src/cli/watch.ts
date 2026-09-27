@@ -10,8 +10,8 @@ import {
   type Questions,
 } from "@typesafe-ai/sdk";
 
-import { listen } from "../listen.js";
 import { createLogger } from "../logger.js";
+import { monitor } from "../monitor/index.js";
 import { bluesky } from "../public/bluesky.js";
 import { twitchChat } from "../public/twitch.js";
 import { recipes } from "../recipes.js";
@@ -179,13 +179,15 @@ export async function watch(sourceSpec: string | undefined, flags: WatchFlags): 
   await ensureApiKey(kind !== "stdin" && Boolean(process.stdin.isTTY && process.stdout.isTTY));
   const client = new TypeSafeClient();
 
-  const listener = listen(source, questions, {
+  const watching = monitor({
+    source,
+    questions,
     client,
     log: createLogger("warn"),
     rate: { perSecond: flags.rate ? Number(flags.rate) : 8, burst: 8 },
     maxQueue: 20,
     ...(flags.context === undefined ? {} : { context: { recent: Number(flags.context) } }),
-    ...(filter ? { filter: (item) => filter.test(item.text) } : {}),
+    ...(filter ? { filter: (item: { text: string }) => filter.test(item.text) } : {}),
     ...(flags.model ? { model: flags.model } : {}),
   });
 
@@ -193,7 +195,7 @@ export async function watch(sourceSpec: string | undefined, flags: WatchFlags): 
     const hateful = event.answers.hateful;
     return hateful?.type === "noul" && hateful.noul >= 0.8;
   };
-  listener.on("judged", (event) => {
+  watching.on("judged", (event) => {
     if (flags.json) {
       process.stdout.write(
         `${JSON.stringify({ at: event.item.at, author: event.item.author?.name, text: event.item.text, answers: event.answers, latencyMs: event.latencyMs })}\n`,
@@ -203,7 +205,7 @@ export async function watch(sourceSpec: string | undefined, flags: WatchFlags): 
     const row = formatRow(questions, event, min, hide(event));
     if (!flags.only || row.fired) process.stdout.write(`${row.line}\n`);
   });
-  listener.on("error", (event) => {
+  watching.on("error", (event) => {
     if (event.error instanceof AuthenticationError || event.error instanceof PermissionDeniedError) {
       // Every item would fail the same way, so stop with one clear message instead.
       const where = envOrigin.TYPESAFE_API_KEY ?? "your shell";
@@ -236,19 +238,19 @@ export async function watch(sourceSpec: string | undefined, flags: WatchFlags): 
   const stop = async () => {
     if (stopping) process.exit(130);
     stopping = true;
-    await listener.stop();
-    if (!flags.json) process.stdout.write(`\n${formatSummary(listener.stats())}\n`);
+    await watching.stop();
+    if (!flags.json) process.stdout.write(`\n${formatSummary(watching.stats())}\n`);
     process.exit(0);
   };
   process.on("SIGINT", () => void stop());
   process.on("SIGTERM", () => void stop());
 
   if (kind === "stdin") {
-    const stats = await listener.run();
+    const stats = await watching.run();
     if (!flags.json) process.stdout.write(`\n${formatSummary(stats)}\n`);
     return;
   }
-  await listener.start();
+  await watching.start();
   if (flags.json) return;
   if (hook) {
     const connected = typeof hook.connected === "function" ? hook.connected(source) : hook.connected;

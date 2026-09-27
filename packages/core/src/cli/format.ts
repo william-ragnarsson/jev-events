@@ -2,7 +2,7 @@ import { styleText } from "node:util";
 
 import type { Question, Questions } from "@typesafe-ai/sdk";
 
-import type { JudgedEvent, ListenerStats } from "../types.js";
+import type { JudgedEvent, MonitorStats } from "../types.js";
 
 type Style = Parameters<typeof styleText>[0];
 
@@ -96,7 +96,7 @@ export function formatRow(questions: Questions, event: JudgedEvent, min: number,
   };
 }
 
-export function formatSummary(stats: ListenerStats): string {
+export function formatSummary(stats: MonitorStats): string {
   const dropped = Object.entries(stats.dropped)
     .filter(([, count]) => count > 0)
     .map(([reason, count]) => `${count} ${reason}`)
