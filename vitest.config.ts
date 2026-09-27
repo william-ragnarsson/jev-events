@@ -12,6 +12,7 @@ export default defineConfig({
       { find: /^@jev-events\/twitch$/, replacement: src("./packages/twitch/src/index.ts") },
       { find: /^@jev-events\/google$/, replacement: src("./packages/google/src/index.ts") },
       { find: /^@jev-events\/slack$/, replacement: src("./packages/slack/src/index.ts") },
+      { find: /^@jev-events\/microsoft$/, replacement: src("./packages/microsoft/src/index.ts") },
     ],
   },
   test: {
