@@ -4,9 +4,9 @@
 // chat message, on your own TypeSafe key, with the stream playing in Twitch's own player above the
 // chat. lib/try/run.ts reads the chat and paces the requests, and /api/try passes each one on to
 // TypeSafe.
-import { ArrowRight, ArrowUpRight, Check, Copy, Square } from 'lucide-react';
+import { ArrowDown, ArrowRight, ArrowUpRight, Check, Copy, Square } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 
 import recipes from '@/generated/recipes.json';
 import type { RecipeEntry } from '@/lib/builder/generate';
@@ -88,6 +88,8 @@ export function TryIt() {
   const [asked, setAsked] = useState<{ id: string; text: string }>();
   const [revealed, setRevealed] = useState<ReadonlySet<string>>(new Set());
   const [tab, setTab] = useState<'chat' | 'code'>('code');
+  // Counts the runs, so each one gets a fresh chat that follows its newest message.
+  const [runs, setRuns] = useState(0);
   const [now, setNow] = useState(0);
   const run = useRef<TryRun>(undefined);
   const stage = useRef<HTMLDivElement>(null);
@@ -148,6 +150,7 @@ export function TryIt() {
     setStreamLogin(login);
     setAsked({ id: pick, text: questionText(pick, custom) });
     setRevealed(new Set());
+    setRuns((n) => n + 1);
     setTab('chat');
     // On phones the stream and the chat are below the form. On wide screens they stay in view, except
     // at the very bottom of the page, where the footer pushes them up.
@@ -379,6 +382,7 @@ export function TryIt() {
             <div className="absolute inset-0 flex flex-col">
               {tab === 'chat' ? (
                 <Chat
+                  key={runs}
                   view={view}
                   question={asked?.text ?? questionText(pick, custom)}
                   redact={asked?.id === 'hateful'}
@@ -449,6 +453,9 @@ function Tab({ on, onClick, children }: { on: boolean; onClick: () => void; chil
   );
 }
 
+/** How near the bottom of the chat still counts as at the bottom, in pixels. */
+const BOTTOM_PX = 24;
+
 function Chat({
   view,
   question,
@@ -462,6 +469,54 @@ function Chat({
   revealed: ReadonlySet<string>;
   onReveal: (id: string) => void;
 }) {
+  const list = useRef<HTMLOListElement>(null);
+  // Where the chat was scrolled to and the size of its box when last looked at.
+  const seen = useRef({ top: 0, width: 0, height: 0 });
+  // Like Twitch's, the chat pauses while you scroll up to read: the messages on screen hold still,
+  // with their answers still coming in, until you scroll back down to the newest.
+  const [held, setHeld] = useState<readonly Row[]>();
+  const live = view !== undefined && view.phase !== 'stopped';
+  const rows = view?.rows ?? [];
+  const latest = new Map(rows.map((row) => [row.message.id, row]));
+  const fresh = (row: Row) => latest.get(row.message.id) ?? row;
+  // The run keeps only its newest rows, so the held ones can include rows it has let go of. Once
+  // it stops, what came in while paused goes below them, so nothing above where you're reading moves.
+  const shown = !held ? rows : live ? held.map(fresh) : [...held.filter((row) => !latest.has(row.message.id)), ...rows];
+
+  // Keeps the answers on the held rows, for when the run lets go of them.
+  useEffect(() => setHeld((held) => held?.map(fresh)), [view?.rows]);
+
+  const look = (el: HTMLOListElement) => {
+    const was = seen.current;
+    seen.current = { top: el.scrollTop, width: el.clientWidth, height: el.clientHeight };
+    return was;
+  };
+
+  // Keeps the newest message in view at the bottom, unless you've scrolled up.
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    if (!held) el.scrollTop = el.scrollHeight;
+    look(el);
+  }, [rows, held]);
+
+  const onScroll = () => {
+    const el = list.current;
+    if (!el) return;
+    const was = look(el);
+    const below = el.scrollHeight - el.scrollTop - el.clientHeight;
+    // A scroll that comes with a new size of box is the browser keeping its place through a resize,
+    // the window's or a phone turning, so the chat keeps following. (Its content changes height all
+    // the time, as rows rise in, so that isn't compared.)
+    if (el.clientWidth !== was.width || el.clientHeight !== was.height) {
+      if (!held) el.scrollTop = el.scrollHeight;
+    }
+    // Any other scroll up pauses it (the pixel is slack for zoomed pages), and only scrolling back
+    // down to the newest picks it up again. Once it has stopped, the rows stay as they are.
+    else if (el.scrollTop < was.top && below > 1 && !held) setHeld(shown);
+    else if (el.scrollTop > was.top && below <= BOTTOM_PX && held && live) setHeld(undefined);
+  };
+
   let empty: string;
   if (!view) empty = "Chat messages and Jev's answers show up here once you start.";
   else if (view.phase === 'joining') empty = `Joining #${view.channel}…`;
@@ -475,9 +530,20 @@ function Chat({
         <span className="mr-2 font-mono text-[10.5px] tracking-[0.14em] text-[var(--dim)] uppercase">Asks</span>
         {question}
       </p>
-      {view && view.rows.length > 0 ? (
-        <ol aria-label="Chat messages with Jev's answers" className="min-h-0 flex-1 overflow-y-auto">
-          {view.rows.map((row) => (
+      {shown.length > 0 ? (
+        // Oldest first, filling up from the bottom (the first row's mt-auto) like a chat. It keeps its
+        // own place, above, so the browser's scroll anchoring is off.
+        <ol
+          ref={list}
+          onScroll={onScroll}
+          onWheel={(e) => {
+            // Pauses on the first turn of the wheel, before a new message can pull the chat back down.
+            if (e.deltaY < 0 && e.currentTarget.scrollTop > 0 && !held) setHeld(shown);
+          }}
+          aria-label="Chat messages with Jev's answers"
+          className="flex min-h-0 flex-1 flex-col divide-y divide-[var(--line)] overflow-y-auto [overflow-anchor:none]"
+        >
+          {shown.map((row) => (
             <FeedRow
               key={row.message.id}
               row={row}
@@ -488,7 +554,22 @@ function Chat({
           ))}
         </ol>
       ) : (
-        <p className="min-h-0 flex-1 px-4 py-5 text-[13px] leading-relaxed text-[var(--muted)]">{empty}</p>
+        <p className="mt-auto px-4 py-3 text-[13px] leading-relaxed text-[var(--muted)]">{empty}</p>
+      )}
+      {held && live && (
+        <button
+          type="button"
+          onClick={() => setHeld(undefined)}
+          className="flex h-9 shrink-0 items-center gap-2 border-t border-[var(--line)] px-4 text-[12.5px] whitespace-nowrap text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+        >
+          {/* Phones leave out why, so it fits on one line. */}
+          <span>
+            Chat paused<span className="hidden sm:inline"> while you scroll up</span>
+          </span>
+          <span className="ml-auto inline-flex items-center gap-1.5 text-[var(--fg)]">
+            Back to the newest <ArrowDown aria-hidden className="size-3.5" />
+          </span>
+        </button>
       )}
       <div className="flex h-10 shrink-0 items-center gap-4 overflow-hidden border-t border-[var(--line)] px-4 font-mono text-[11px] whitespace-nowrap text-[var(--dim)]">
         <Stat n={view?.read ?? 0}>read</Stat>
@@ -523,7 +604,7 @@ function FeedRow({ row, redact, revealed, onReveal }: { row: Row; redact: boolea
   const yes = state.status === 'answered' && state.answer.type === 'noul' && state.answer.p >= 0.5;
   const hidden = redact && yes && !revealed;
   return (
-    <li className={`landing-rise flex items-baseline gap-4 border-b border-[var(--line)] px-4 py-2 ${yes ? 'landing-line-on' : ''}`}>
+    <li className={`landing-rise flex shrink-0 items-baseline gap-4 px-4 py-2 first:mt-auto ${yes ? 'landing-line-on' : ''}`}>
       <p className="min-w-0 flex-1 text-[13px] leading-snug break-words">
         <span className="mr-2 font-medium text-[var(--muted)]" style={{ color: nameColor(message) }}>
           {message.author}

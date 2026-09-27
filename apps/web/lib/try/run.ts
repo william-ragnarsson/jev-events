@@ -40,7 +40,7 @@ export type Phase = 'joining' | 'reading' | 'waiting' | 'stopped';
 export interface RunView {
   channel: string;
   phase: Phase;
-  /** What was asked, newest first. */
+  /** What was asked, oldest first, the way a chat lists it. */
   rows: Row[];
   /** Messages read, leaving out "!commands" and bots. */
   read: number;
@@ -268,7 +268,7 @@ export class TryRun {
     const controller = new AbortController();
     this.#inflight.add(controller);
     const row: Row = { message, state: { status: 'asking' } };
-    this.#update({ rows: [row, ...this.#view.rows].slice(0, ROWS) });
+    this.#update({ rows: [...this.#view.rows, row].slice(-ROWS) });
 
     void fetch('/api/try', {
       method: 'POST',
