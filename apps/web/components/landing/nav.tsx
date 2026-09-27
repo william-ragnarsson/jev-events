@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { Logo } from '@/components/logo';
 import { site } from '@/lib/site';
-import { Mark } from './ui';
 
 // Three ways in and nothing else. On phones the middle one is just "Try it".
 const LINKS = [
@@ -19,7 +19,7 @@ export function Nav() {
     <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[color-mix(in_oklab,var(--bg)_70%,transparent)] backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4 sm:px-6">
         <Link href="/" className="flex shrink-0 items-center gap-2.5 text-[15px] font-semibold tracking-tight">
-          <Mark className="size-6" />
+          <Logo className="size-6" />
           {site.name}
         </Link>
         <nav aria-label="Main" className="ml-auto flex items-center gap-5 text-[13.5px] sm:gap-7">

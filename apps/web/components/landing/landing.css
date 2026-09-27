@@ -18,7 +18,8 @@
   --tok-punc: #7d838c;
   --tok-id: #c5cad2;
   --tok-ln: #353a42;
-  /* The exact blue isn't settled yet; change it here. --accent-ink is the text color on top of it. */
+  /* The exact blue isn't settled yet; change it here and in lib/brand.ts, which the logo is drawn from
+     (a test keeps them equal). --accent-ink is the text color on top of it. */
   --accent: #8ab8ff;
   --accent-ink: #04111f;
   /* Jev's verdicts in the hero console: --match when a monitor's question comes back yes and it

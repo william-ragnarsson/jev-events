@@ -298,11 +298,24 @@ describe("TryRun", () => {
     });
     expect(run.view).toMatchObject({ read: 3, answered: 3, skipped: 0, latencyMs: 120, model: "jev-test" });
     expect(run.view.spentUsd).toBeCloseTo((3 * 200 * CORE_PRICE) / 1_000_000);
-    expect(run.view.rows.map((row) => row.message.text)).toEqual(["message 2", "message 1", "message 0"]);
-    expect(run.view.rows[0]?.state).toEqual({ status: "answered", answer: { type: "noul", p: 0.9 }, latencyMs: 120 });
+    expect(run.view.rows.map((row) => row.message.text)).toEqual(["message 0", "message 1", "message 2"]);
+    expect(run.view.rows.at(-1)?.state).toEqual({ status: "answered", answer: { type: "noul", p: 0.9 }, latencyMs: 120 });
     // The page hears about it, but not once per change.
     expect(views.at(-1)).toBe(run.view);
     expect(views.length).toBeLessThan(10);
+  });
+
+  it("keeps the newest 60 for the page, oldest first as in a chat", async () => {
+    const { run } = start();
+    socket().join();
+    for (let i = 0; i < 61; i++) {
+      socket().receive(...chat(1, i));
+      await vi.advanceTimersByTimeAsync(500);
+    }
+    expect(run.view.answered).toBe(61);
+    expect(run.view.rows).toHaveLength(60);
+    expect(run.view.rows[0]?.message.text).toBe("message 1");
+    expect(run.view.rows.at(-1)?.message.text).toBe("message 60");
   });
 
   it("leaves out commands and bots", async () => {

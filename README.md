@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/jev-events"><img src="https://img.shields.io/npm/v/jev-events?color=c0f84f&labelColor=0a0a0a" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/jev-events"><img src="https://img.shields.io/npm/v/jev-events?color=8ab8ff&labelColor=0c0e12" alt="npm version"></a>
   <a href="https://github.com/william-popmie/jev-events/actions/workflows/ci.yml"><img src="https://github.com/william-popmie/jev-events/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-c0f84f?labelColor=0a0a0a" alt="MIT license"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8ab8ff?labelColor=0c0e12" alt="MIT license"></a>
 </p>
 
 <p align="center">
