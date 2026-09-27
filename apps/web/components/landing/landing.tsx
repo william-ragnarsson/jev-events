@@ -1,6 +1,8 @@
 // The home page: a console of monitors at work, one monitor walked through step by step, then the
-// ways in. It brings its own nav, footer and theme (landing.css), separate from the docs.
+// ways in. LandingShell gives it and the Try it page their own nav, footer and theme (landing.css),
+// separate from the docs.
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 
 import { site } from '@/lib/site';
 import { archivo } from './fonts';
@@ -12,22 +14,28 @@ import { Story } from './story';
 import { Mark } from './ui';
 import './landing.css';
 
-export function Landing() {
+export function LandingShell({ children }: { children: ReactNode }) {
   return (
     <div className={`landing ${archivo.variable} min-h-screen font-sans antialiased`}>
       <Nav />
-      <Reveal>
-        <main>
-          <Hero />
-          <Logos />
-          <Story />
-          <WhyJev />
-          <Integrations />
-          <Closing />
-        </main>
-      </Reveal>
+      {children}
       <Footer />
     </div>
+  );
+}
+
+export function Landing() {
+  return (
+    <Reveal>
+      <main>
+        <Hero />
+        <Logos />
+        <Story />
+        <WhyJev />
+        <Integrations />
+        <Closing />
+      </main>
+    </Reveal>
   );
 }
 

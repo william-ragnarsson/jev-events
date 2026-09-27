@@ -6,9 +6,8 @@ import type { CSSProperties } from 'react';
 import { site } from '@/lib/site';
 import { BRANDS } from './brands';
 import { INTEGRATIONS, JEV_FACTS } from './content';
-import { InstallCommand } from './install';
 import { SpotlightGrid } from './spotlight';
-import { H2, Kicker, QuickstartLink } from './ui';
+import { H2, Kicker, QuickstartLink, TryLink } from './ui';
 import { WaitlistForm } from './waitlist';
 
 export function Logos() {
@@ -146,9 +145,9 @@ export function Closing() {
             It&apos;s an open-source TypeScript library under the MIT license. Monitors start in dry-run, so you can point one at a real
             account without it changing anything.
           </p>
-          <div className="mt-auto flex flex-wrap items-center gap-x-6 gap-y-3 pt-9">
+          <div className="mt-auto flex flex-wrap items-center gap-3 pt-9">
             <QuickstartLink />
-            <InstallCommand />
+            <TryLink />
           </div>
         </div>
         <WaitlistForm />
