@@ -8,11 +8,6 @@ import { BRAND } from './brand';
 
 export const OG_SIZE = { width: 1200, height: 630 };
 
-// The dark theme's colors, in hex because the image renderer doesn't read oklch.
-const SIGNAL = BRAND.accent;
-const MUTED = '#a3a3a3';
-const FAINT = '#737373';
-
 async function fonts() {
   const dir = join(process.cwd(), 'assets', 'fonts');
   const [sans, mono] = await Promise.all([
@@ -25,27 +20,16 @@ async function fonts() {
   ];
 }
 
-const CHIPS = [
-  { label: 'kind:question', color: '#7dd3fc' },
-  { label: 'kind:hype', color: '#fcd34d' },
-  { label: 'hateful', color: '#fca5a5' },
-];
-
-/**
- * The social card for every page. `accent` words of the title are drawn in the signal color.
- */
+/** The social card for every page: cream type on the blue, like the home page. */
 export async function renderOgImage({
   title,
   description,
   eyebrow,
-  accent = [],
 }: {
   title: string;
   description?: string;
   eyebrow?: string;
-  accent?: string[];
 }) {
-  const words = title.split(' ');
   return new ImageResponse(
     <div
       style={{
@@ -55,58 +39,41 @@ export async function renderOgImage({
         flexDirection: 'column',
         justifyContent: 'space-between',
         padding: '64px 72px',
-        backgroundColor: '#050505',
-        backgroundImage: 'radial-gradient(circle at 88% -10%, rgba(138, 184, 255, 0.16), transparent 55%)',
-        color: '#fafafa',
+        backgroundColor: BRAND.field,
+        color: BRAND.cream,
         fontFamily: 'Geist',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-        <Logo width={52} height={52} />
-        <div style={{ fontSize: 34, letterSpacing: -0.5 }}>Jev Events</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <Logo tone="field" width={48} height={48} />
+        <div style={{ fontSize: 32, letterSpacing: -0.5 }}>Jev Events</div>
         {eyebrow && (
-          <div style={{ display: 'flex', marginLeft: 14, fontFamily: 'Geist Mono', fontSize: 22, color: FAINT }}>
+          <div style={{ display: 'flex', marginLeft: 12, fontFamily: 'Geist Mono', fontSize: 22, opacity: 0.7 }}>
             {`/ ${eyebrow}`}
           </div>
         )}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', maxWidth: 1000, fontSize: title.length > 40 ? 72 : 84, lineHeight: 1.06, letterSpacing: -2.5 }}>
-          {words.map((word, index) => (
-            <span
-              key={index}
-              style={{ marginRight: 16, color: accent.includes(word.replace(/[.,]$/, '')) ? SIGNAL : '#fafafa' }}
-            >
-              {word}
-            </span>
-          ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        <div
+          style={{
+            display: 'flex',
+            maxWidth: 1040,
+            fontSize: title.length > 32 ? 80 : 104,
+            lineHeight: 0.98,
+            letterSpacing: title.length > 32 ? -3 : -4.5,
+          }}
+        >
+          {title}
         </div>
         {description && (
-          <div style={{ display: 'flex', maxWidth: 940, fontSize: 30, lineHeight: 1.35, color: MUTED }}>{description}</div>
+          <div style={{ display: 'flex', maxWidth: 940, fontSize: 30, lineHeight: 1.35, opacity: 0.8 }}>
+            {description}
+          </div>
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'Geist Mono', fontSize: 22 }}>
-        <div style={{ display: 'flex', color: FAINT }}>jevevents.dev</div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          {CHIPS.map((chip) => (
-            <div
-              key={chip.label}
-              style={{
-                display: 'flex',
-                padding: '6px 14px',
-                borderRadius: 10,
-                border: `1.5px solid ${chip.color}55`,
-                backgroundColor: `${chip.color}14`,
-                color: chip.color,
-              }}
-            >
-              {chip.label}
-            </div>
-          ))}
-        </div>
-      </div>
+      <div style={{ display: 'flex', fontFamily: 'Geist Mono', fontSize: 22, opacity: 0.7 }}>jevevents.dev</div>
     </div>,
     { ...OG_SIZE, fonts: await fonts() },
   );

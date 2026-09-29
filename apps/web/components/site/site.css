@@ -1,0 +1,216 @@
+/* The frame every page shares: the nav on top, the footer at the bottom, and the side gutter the
+   pages line up on. */
+.site {
+  --gutter: 64px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+}
+
+@media (max-width: 1023px) {
+  .site {
+    --gutter: 32px;
+  }
+}
+
+@media (max-width: 639px) {
+  .site {
+    --gutter: 20px;
+  }
+}
+
+.skip-link {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  padding: 10px 14px;
+  background: var(--color-ink);
+  color: var(--color-cream);
+  font-size: 15px;
+  font-weight: 700;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus-visible {
+  transform: none;
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  height: 96px;
+  padding: 0 var(--gutter);
+}
+
+.site-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.site-logo svg {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.site-links {
+  display: flex;
+  gap: 40px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 17px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.site-links a[aria-current='page'] {
+  text-decoration: underline;
+  text-underline-offset: 8px;
+  text-decoration-thickness: 2px;
+}
+
+.site-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 32px;
+  min-height: 96px;
+  border-top: 1px solid currentColor;
+  font-size: 15px;
+}
+
+.site-footer p {
+  margin: 0;
+}
+
+.site-footer ul {
+  display: flex;
+  gap: 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-footer ul a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* On the paper pages the footer closes the page: pushed to the bottom, on the gutter. */
+.site-footer.on-paper {
+  margin: auto var(--gutter) 0;
+}
+
+/* The page for an address with nothing at it: the docs' rule under the nav, then their title and
+   lead. */
+.not-found {
+  margin: 24px var(--gutter) 0;
+  padding: 40px 0 120px;
+  border-top: 2px solid var(--color-ink);
+}
+
+.not-found h1 {
+  margin: 0;
+  font-size: 64px;
+  line-height: 64px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.not-found p {
+  max-width: 680px;
+  margin: 20px 0 0;
+  font-size: 17px;
+  line-height: 28px;
+}
+
+.not-found .not-found-lead {
+  margin-top: 24px;
+  font-size: 24px;
+  line-height: 34px;
+  font-weight: 500;
+  text-wrap: pretty;
+}
+
+.not-found p a {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--color-field);
+  text-underline-offset: 4px;
+}
+
+@media (max-width: 767px) {
+  .site-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px 0 12px;
+  }
+}
+
+@media (max-width: 639px) {
+  .site-nav {
+    gap: 16px;
+    height: 72px;
+  }
+
+  .site-logo {
+    gap: 10px;
+    font-size: 17px;
+  }
+
+  .site-logo svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .site-links {
+    gap: 20px;
+  }
+
+  .site-links a {
+    font-size: 16px;
+  }
+
+  .not-found h1 {
+    font-size: 42px;
+    line-height: 46px;
+  }
+
+  .not-found .not-found-lead {
+    font-size: 20px;
+    line-height: 30px;
+  }
+}
+
+@media (max-width: 359px) {
+  .site-logo {
+    font-size: 16px;
+  }
+
+  .site-links {
+    gap: 14px;
+  }
+
+  .site-links a {
+    font-size: 15px;
+  }
+}

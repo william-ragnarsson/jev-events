@@ -1,14 +1,11 @@
 ---
 title: For your users
 description: Run a monitor for every user who connects an account, from your own web app.
-icon: Users
 ---
 
 On your machine, a monitor reads the one account you signed in with `npx jev-events auth`. In a product, each of your users connects their own account, and the same monitor runs once for each of them. `runtime()` does that part. It keeps every connection and its tokens in your Postgres database, serves the sign-in and webhook routes, and checks for new items when your scheduler asks.
 
-<Callout title="The builder writes all of this">
-  Each integration page has a builder. Choose **For my users** under **Where it runs**, and it writes every file on this page for that platform, with the steps to register your app there. Start from [Gmail](/docs/integrations/gmail), [Google Calendar](/docs/integrations/google-calendar), [Slack](/docs/integrations/slack) or [Twitch](/docs/integrations/twitch).
-</Callout>
+**The builder writes all of this.** Each integration's page has a builder. Choose **For your users** under **Where it runs**, and it writes every file on this page for that platform, with the steps to register your app there. Start from [Gmail](/docs/integrations/gmail), [Google Calendar](/docs/integrations/google-calendar), [Slack](/docs/integrations/slack) or [Twitch](/docs/integrations/twitch).
 
 ## How it fits together
 

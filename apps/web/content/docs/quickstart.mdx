@@ -1,17 +1,13 @@
 ---
 title: Quickstart
 description: Label a live Twitch chat with Jev in five minutes, then let it moderate your own channel.
-icon: Rocket
 ---
 
-<Callout title="No code first?">
-  `npx jev-events watch twitch:<any live channel>` prints what Jev says about each chat message in your terminal, with no Twitch account. `watch gmail`, `watch calendar` and `watch slack` work the same once you install the integration and sign in with `auth google` or `auth slack`. See [the CLI](/docs/cli).
-</Callout>
+**No code first?** `npx jev-events watch twitch:<any live channel>` prints what Jev says about each chat message in your terminal, with no Twitch account. `watch gmail`, `watch calendar` and `watch slack` work the same once you install the integration and sign in with `auth google` or `auth slack`. See [the CLI](/docs/cli).
 
 <Steps>
-<Step>
 
-### Install
+## Install
 
 Jev Events needs Node.js 22 or newer. Make a folder, and install it with `tsx`, which runs TypeScript:
 
@@ -21,41 +17,35 @@ npm init -y && npm pkg set type=module
 npm i jev-events tsx
 ```
 
-</Step>
-<Step>
-
-### Add your TypeSafe key
+## Add your TypeSafe key
 
 Get an API key from [TypeSafe](https://docs.typesafe.ai/introduction/quickstart) and put this line in a file called `.env` next to your code:
 
-```txt
+```dotenv title=".env" mark="<your key>"
 TYPESAFE_API_KEY=<your key>
 ```
 
-</Step>
-<Step>
-
-### Write a monitor
+## Write a monitor
 
 Reading a public Twitch chat needs no Twitch account. Pick any channel that is live right now, and put its name where the code says `some_live_channel`.
 
-<Snippet name="quickstart" title="monitor.ts" />
+<Snippet name="quickstart" title="monitor.ts" mark='"some_live_channel"' />
 
-</Step>
-<Step>
-
-### Run it
+## Run it
 
 ```bash
 npx tsx --env-file=.env monitor.ts
 ```
 
+```txt
+[question] mira_plays: what rank are you now?
+[question] bytebandit: is this the new patch?
+[hateful] anon_4412 (0.94)
+```
+
 Questions for the streamer are printed as they arrive, and so are hateful messages Jev is at least 90% sure about. Stop it with Ctrl+C.
 
-</Step>
-<Step>
-
-### Moderate your own channel
+## Moderate your own channel
 
 To act in chat, the monitor has to read it as you. Install the Twitch integration and sign in once:
 
@@ -66,7 +56,7 @@ npx jev-events auth twitch
 
 The first time, `auth twitch` walks you through registering your own Twitch app, then shows a code to approve on Twitch. The sign-in is saved in `.jev-events/`, which git ignores. Then read your own channel and add a native action:
 
-```ts title="monitor.ts"
+```ts title="monitor.ts" mark="twitch.chat()|twitch.timeout({ seconds: 600 })"
 import { monitor, recipes } from "jev-events";
 import { twitch } from "@jev-events/twitch";
 
@@ -86,12 +76,15 @@ Run it the same way. Native actions start in dry-run, so the timeout only prints
 
 When those lines look right, pass `dryRun: false` to `monitor()`. The [Twitch guide](/docs/integrations/twitch) covers every action, and its builder writes the code for the questions and actions you pick.
 
-</Step>
 </Steps>
 
 ## Next
 
-- [For your users](/docs/your-users): run the same monitor for everyone who connects an account to your product.
-- [Questions](/docs/concepts/questions): write your own, and choose how sure Jev has to be.
-- [Safety](/docs/concepts/safety): dry-run, protected users, budgets and the audit log.
-- [Recipes](/docs/recipes): ready-made questions to start from.
+<Rows>
+
+- [For your users](/docs/your-users) Run the same monitor for everyone who connects an account to your product.
+- [Questions](/docs/concepts/questions) Write your own, and choose how sure Jev has to be.
+- [Safety](/docs/concepts/safety) Dry-run, protected users, budgets and the audit log.
+- [Recipes](/docs/recipes) Ready-made questions to start from.
+
+</Rows>

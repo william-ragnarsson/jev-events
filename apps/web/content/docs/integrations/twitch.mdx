@@ -1,7 +1,6 @@
 ---
 title: Twitch
 description: Judge chat as it happens, then time out, delete, warn, reply or clip.
-icon: Gamepad2
 ---
 
 Jev Events reads chat as each message arrives, asks Jev your questions about it, and runs what you pick on the answers. Choose below, and the code and the steps to run it fill in.
@@ -53,7 +52,7 @@ Chat comes over a WebSocket that stays open, so in a web app it runs in a worker
 | `twitch.say(text)` | Says something in chat | `user:write:chat` |
 | `twitch.clip()` | Clips the live stream. Pair it with `burst()` so a hype moment makes one clip, not fifty | `clips:edit` |
 
-Reading chat needs `user:read:chat`. `reason` and `text` can be strings or functions of the event, such as ``(e) => `@${e.item.author.name} thanks!` ``. The default reason shows moderators why it acted, for example `jev-events: kind:hateful (93%)`. Actions are [dry-run](/docs/concepts/safety) until you pass `dryRun: false` to `monitor()`.
+Reading chat needs `user:read:chat`. `reason` and `text` can be strings or functions of the event, such as `` (e) => `@${e.item.author.name} thanks!` ``. The default reason shows moderators why it acted, for example `jev-events: kind:hateful (93%)`. Actions are [dry-run](/docs/concepts/safety) until you pass `dryRun: false` to `monitor()`.
 
 ## Chat messages
 
@@ -72,7 +71,10 @@ Jev sees the text, the author's name and roles, `firstMessage` and the reply, pl
 
 ## Good to know
 
-- **Protected users.** Actions never run on the broadcaster, moderators, VIPs or Twitch staff.
-- **Fresh or not at all.** Messages that waited more than 10 seconds to be judged are dropped instead of acted on late.
-- **Three connections.** Twitch allows 3 chat connections per account and app, so one account can be read by at most 3 monitors or `watch` runs at a time.
-- **A server with one account of your own.** `twitch.fromEnv()` builds the connection from `TWITCH_CLIENT_ID` and `TWITCH_ACCESS_TOKEN`, plus `TWITCH_REFRESH_TOKEN` and `TWITCH_CLIENT_SECRET` when you have them: `await mods.start({ connections: [twitch.fromEnv()] })`. Renewed tokens can't be written back to your environment. A Confidential app's refresh token keeps working, but a Public app's is spent after the first renewal, so use a Confidential app here.
+**Protected users.** Actions never run on the broadcaster, moderators, VIPs or Twitch staff.
+
+**Fresh or not at all.** Messages that waited more than 10 seconds to be judged are dropped instead of acted on late.
+
+**Three connections.** Twitch allows 3 chat connections per account and app, so one account can be read by at most 3 monitors or `watch` runs at a time.
+
+**A server with one account of your own.** `twitch.fromEnv()` builds the connection from `TWITCH_CLIENT_ID` and `TWITCH_ACCESS_TOKEN`, plus `TWITCH_REFRESH_TOKEN` and `TWITCH_CLIENT_SECRET` when you have them: `await mods.start({ connections: [twitch.fromEnv()] })`. Renewed tokens can't be written back to your environment. A Confidential app's refresh token keeps working, but a Public app's is spent after the first renewal, so use a Confidential app here.

@@ -8,7 +8,6 @@ export const contentType = 'image/png';
 export default function Image() {
   return renderOgImage({
     title: site.tagline,
-    description: 'An open-source TypeScript library built on TypeSafe’s Jev.',
-    accent: ['typed', 'semantic'],
+    description: 'A TypeScript library that asks TypeSafe’s Jev about every new email, invite or message your users get.',
   });
 }

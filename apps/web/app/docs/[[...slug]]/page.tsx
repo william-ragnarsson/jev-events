@@ -1,17 +1,22 @@
-import { source } from '@/lib/source';
-import {
-  DocsBody,
-  DocsDescription,
-  DocsPage,
-  DocsTitle,
-  MarkdownCopyButton,
-  ViewOptionsPopover,
-} from 'fumadocs-ui/layouts/docs/page';
-import { notFound } from 'next/navigation';
-import { getMDXComponents } from '@/components/mdx';
-import type { Metadata } from 'next';
+import { findNeighbour } from 'fumadocs-core/page-tree';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import type { ComponentType, SVGProps } from 'react';
+
+import { GmailIcon, GoogleCalendarIcon, SlackIcon, TwitchIcon } from '@/components/brand-icons';
+import { Pager } from '@/components/docs/pager';
+import { getMDXComponents } from '@/components/mdx';
+import { INTEGRATIONS, type IntegrationId } from '@/lib/builder/catalog';
 import { getPageImageUrl, getPageMarkdownUrl, gitConfig } from '@/lib/shared';
+import { source } from '@/lib/source';
+
+const ICONS: Record<IntegrationId, ComponentType<SVGProps<SVGSVGElement>>> = {
+  gmail: GmailIcon,
+  calendar: GoogleCalendarIcon,
+  slack: SlackIcon,
+  twitch: TwitchIcon,
+};
 
 export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   const params = await props.params;
@@ -19,28 +24,24 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   if (!page) notFound();
 
   const MDX = page.data.body;
-  const markdownUrl = getPageMarkdownUrl(page).url;
+  const integration = INTEGRATIONS.find((spec) => spec.docs === page.url);
+  const Icon = integration ? ICONS[integration.id] : null;
+  const next = findNeighbour(source.getPageTree(), page.url).next;
 
   return (
-    <DocsPage toc={page.data.toc} full={page.data.full}>
-      <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
-      <div className="flex flex-row gap-2 items-center border-b pb-6">
-        <MarkdownCopyButton markdownUrl={markdownUrl} />
-        <ViewOptionsPopover
-          markdownUrl={markdownUrl}
-          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/${gitConfig.contentDir}/${page.path}`}
-        />
-      </div>
-      <DocsBody>
-        <MDX
-          components={getMDXComponents({
-            // this allows you to link to other pages with relative file paths
-            a: createRelativeLink(source, page),
-          })}
-        />
-      </DocsBody>
-    </DocsPage>
+    <main id="main" className="docs-main">
+      <h1>
+        {Icon ? <Icon aria-hidden="true" /> : null}
+        {page.data.title}
+      </h1>
+      {page.data.description ? <p className="docs-lead">{page.data.description}</p> : null}
+      <MDX components={getMDXComponents({ a: createRelativeLink(source, page) })} />
+      <Pager
+        editUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/${gitConfig.contentDir}/${page.path}`}
+        markdownUrl={getPageMarkdownUrl(page).url}
+        next={next ? { name: next.name, url: next.url } : undefined}
+      />
+    </main>
   );
 }
 

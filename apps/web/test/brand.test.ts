@@ -12,8 +12,10 @@ describe("the logo", () => {
     expect(read("app/icon.svg")).toBe(markSvg());
   });
 
-  it("is lit in the site's accent", () => {
-    expect(read("components/landing/landing.css")).toContain(`--accent: ${BRAND.accent};`);
-    expect(read("app/global.css")).toContain(`--color-signal: ${BRAND.accent};`);
+  it("is printed in the site's colors", () => {
+    const css = read("app/global.css");
+    expect(css).toContain(`--color-field: ${BRAND.field};`);
+    expect(css).toContain(`--color-cream: ${BRAND.cream};`);
+    expect(css).toContain(`--color-ink: ${BRAND.ink};`);
   });
 });

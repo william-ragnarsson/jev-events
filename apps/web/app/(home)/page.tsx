@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
 
-import { Landing } from '@/components/landing/landing';
+import { Closing } from '@/components/home/closing';
+import { Hero } from '@/components/home/hero';
+import { HowItWorks } from '@/components/home/how-it-works';
+import { WorksWith } from '@/components/home/works-with';
+import { Nav } from '@/components/site/nav';
 import { site } from '@/lib/site';
 
 const title = 'Jev Events: Ask every event a question';
@@ -15,5 +19,15 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  return <Landing />;
+  return (
+    <>
+      <Nav tone="field" current="/" />
+      <main id="main" className="home">
+        <Hero />
+        <HowItWorks />
+        <WorksWith />
+        <Closing />
+      </main>
+    </>
+  );
 }

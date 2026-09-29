@@ -1,82 +1,128 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useId, useState } from 'react';
 
 import { INTEGRATIONS } from '@/lib/builder/catalog';
 import type { Target } from '@/lib/builder/generate';
-import { agentPrompt, type PromptStream } from '@/lib/builder/markdown';
-import { CopyButton, INPUT, Segmented } from './controls';
+import { agentPrompt, agentPromptParts, type PromptStream } from '@/lib/builder/markdown';
+import { CopyButton } from './code';
 
 const STREAMS: readonly { id: PromptStream; label: string }[] = [
   ...INTEGRATIONS.map((spec) => ({ id: spec.id, label: spec.name })),
   { id: 'other', label: 'Something else' },
 ];
 
-/** A prompt to paste into a coding agent, which then sets Jev Events up in the project. */
+const WHERE: readonly { target: Target; label: string; hint: string }[] = [
+  { target: 'local', label: 'On your machine', hint: 'With your own account. The quickest way to try it.' },
+  { target: 'users', label: 'For your users', hint: 'In your web app, where each user connects their own account.' },
+];
+
+/**
+ * The Introduction's blue block: what to watch, what should happen and where it runs, written into
+ * a prompt for a coding agent, which then sets Jev Events up in the project. The answers show in
+ * blue in the prompt, so it's clear what the choices changed.
+ */
 export function AgentPrompt() {
-  const [streams, setStreams] = useState<PromptStream[]>([]);
+  const id = useId();
+  const [streams, setStreams] = useState<PromptStream[]>(['gmail']);
   const [goal, setGoal] = useState('');
   const [target, setTarget] = useState<Target>('local');
-  const prompt = agentPrompt({ streams, goal, target });
+  const options = { streams, goal, target };
+  const { intro, answers, how } = agentPromptParts(options);
+  const prompt = agentPrompt(options);
+
+  // Kept in the order they're listed, however they were picked.
+  const toggle = (stream: PromptStream, on: boolean) =>
+    setStreams((current) => STREAMS.map((s) => s.id).filter((s) => (s === stream ? on : current.includes(s))));
 
   return (
-    <div className="not-prose my-6 overflow-hidden rounded-xl border bg-fd-card text-sm">
-      <div className="flex flex-col gap-4 p-4">
-        <fieldset>
-          <legend className="mb-2 font-medium">What to watch</legend>
-          <div className="flex flex-wrap gap-x-5 gap-y-2">
-            {STREAMS.map((stream) => (
-              <label key={stream.id} className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  className="accent-(--color-fd-primary)"
-                  checked={streams.includes(stream.id)}
-                  onChange={(event) =>
-                    setStreams((current) =>
-                      event.target.checked ? STREAMS.map((s) => s.id).filter((id) => id === stream.id || current.includes(id)) : current.filter((id) => id !== stream.id),
-                    )
-                  }
-                />
-                {stream.label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <label className="flex flex-col gap-2">
-          <span className="font-medium">What should happen</span>
-          <textarea
-            rows={2}
-            value={goal}
-            placeholder="For example: label emails that need a reply, and archive newsletters."
-            onChange={(event) => setGoal(event.target.value)}
-            className={INPUT}
-          />
-        </label>
-        <div className="flex flex-col gap-2">
-          <span className="font-medium">Where it runs</span>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-            <Segmented
-              label="Where it runs"
-              value={target}
-              onChange={setTarget}
-              options={[
-                { value: 'local', label: 'On my machine' },
-                { value: 'users', label: 'For my users' },
-              ]}
+    <section id="agent" className="docs-agent on-field" aria-labelledby={`${id}-title`}>
+      <h2 id={`${id}-title`}>Set it up with your coding agent</h2>
+      <p>
+        Pick what to watch and what should happen, then paste the prompt into Claude Code, Cursor or any other coding
+        agent. It reads these docs, writes the code, and tells you each step that needs you.
+      </p>
+
+      <span id={`${id}-watch`} className="field-label">
+        What to watch
+      </span>
+      <div role="group" aria-labelledby={`${id}-watch`} className="field-checks">
+        {STREAMS.map((stream) => (
+          <label key={stream.id} className="field-choice">
+            <input
+              type="checkbox"
+              className="field-input-hidden"
+              checked={streams.includes(stream.id)}
+              onChange={(event) => toggle(stream.id, event.target.checked)}
             />
-            <span className="text-fd-muted-foreground">
-              {target === 'local' ? 'With your own account. The quickest way to try it.' : 'In your web app, where each user connects their own account.'}
+            <span className="field-box" aria-hidden="true">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M2 6.2 4.8 9 10 3" />
+              </svg>
             </span>
-          </div>
-        </div>
+            {stream.label}
+          </label>
+        ))}
       </div>
-      <div className="border-t">
-        <div className="flex items-center justify-between gap-2 px-4 pt-3">
-          <span className="text-xs text-fd-muted-foreground">The prompt</span>
-          <CopyButton text={() => prompt}>Copy prompt</CopyButton>
+
+      <label htmlFor={`${id}-goal`} className="field-label">
+        What should happen
+      </label>
+      <input
+        id={`${id}-goal`}
+        type="text"
+        className="field-text"
+        value={goal}
+        placeholder="For example: label emails that need a reply, and archive newsletters."
+        onChange={(event) => setGoal(event.target.value)}
+      />
+
+      <span id={`${id}-where`} className="field-label">
+        Where it runs
+      </span>
+      <div className="field-row">
+        <div role="radiogroup" aria-labelledby={`${id}-where`} className="field-seg">
+          {WHERE.map((where) => (
+            <label key={where.target}>
+              <input
+                type="radio"
+                name={`${id}-where`}
+                className="field-input-hidden"
+                checked={target === where.target}
+                onChange={() => setTarget(where.target)}
+              />
+              <span>{where.label}</span>
+            </label>
+          ))}
         </div>
-        <pre className="max-h-72 overflow-auto px-4 pt-2 pb-4 font-mono text-[13px] leading-relaxed whitespace-pre-wrap text-fd-muted-foreground">{prompt}</pre>
+        <p className="field-hint">{WHERE.find((where) => where.target === target)?.hint}</p>
       </div>
-    </div>
+
+      <span id={`${id}-prompt`} className="field-label">
+        The prompt
+      </span>
+      <div role="region" aria-labelledby={`${id}-prompt`} tabIndex={0} className="docs-prompt">
+        <p>{intro}</p>
+        <p>
+          {answers.map(([label, value], index) => (
+            <Fragment key={label}>
+              {index > 0 ? '\n' : null}
+              {label}: <strong>{value}</strong>
+            </Fragment>
+          ))}
+        </p>
+        <p>{['How:', ...how].join('\n')}</p>
+      </div>
+      <CopyButton className="field-button" label="Copy the prompt" text={() => prompt} reset={prompt} hold />
+    </section>
   );
 }

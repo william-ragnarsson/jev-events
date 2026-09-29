@@ -8,10 +8,12 @@ npm run dev -w @jev-events/web   # http://localhost:3000
 
 | Path | What's there |
 | --- | --- |
-| `app/(home)` | The landing page |
+| `app/(home)`, `components/home`, `components/try` | The home page and Try it, the live Twitch demo |
+| `components/site` | The nav and footer every page shares |
 | `app/docs`, `content/docs` | The docs, written in MDX |
 | `app/og`, `lib/og.tsx` | Social preview images, rendered at build time |
-| `lib/builder`, `components/docs` | The builder on each integration's page and the prompt at the top of the docs. Both write a project's code from what the reader picks |
+| `components/docs`, `lib/docs-code.ts` | The docs' sidebar, pager and code blocks, and the parts of code they mark in blue |
+| `lib/builder` | The builder on each integration's page and the prompt at the top of the docs. Both write a project's code from what the reader picks |
 | `lib/llms.ts` | `/llms.txt`, `/llms-full.txt` and each page as Markdown, for coding agents |
 | `snippets` | Code examples for the site. They're type-checked, and the `snippets/testing*.ts` examples run as tests |
 | `generated` | Data for the site: snippets, recipes, the dataset summary and benchmark results |

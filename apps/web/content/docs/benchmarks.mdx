@@ -1,7 +1,6 @@
 ---
 title: Benchmarks
 description: How well Jev labels live chat, measured on a labeled dataset that lives in the repository.
-icon: Gauge
 ---
 
 Every accuracy number on this site comes from here. The dataset, the scoring code and the runner are open source, so you can check them and run them on your own key.
@@ -33,7 +32,7 @@ Each message is asked once and scored on that answer, and flags are reported at 
 ## Run it yourself
 
 ```bash
-git clone https://github.com/william-popmie/jev-events && cd jev-events
+git clone https://github.com/william-ragnarsson/jev-events && cd jev-events
 npm ci
 export TYPESAFE_API_KEY=...
 npm run eval -- --mode all     # writes evals/results/*.json

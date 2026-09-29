@@ -10,29 +10,37 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { CATALOG, INTEGRATIONS, twitchLogin, type IntegrationId } from "../lib/builder/catalog.js";
 import {
   actionsFor,
+  firstPicks,
   generate,
   identifier,
+  MINS,
+  pickedConfig,
   recipeOptions,
   recipeQuestion,
   resolveQuestions,
   siteUrl,
-  starter,
   valuesFor,
   type BuilderConfig,
   type Generated,
+  type Picks,
   type QuestionConfig,
   type RecipeEntry,
   type RuleConfig,
-  type Target,
 } from "../lib/builder/generate.js";
 import { manifest, manifestUrl } from "../lib/builder/slack-manifest.js";
 
 const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const RECIPES = JSON.parse(readFileSync(join(ROOT, "apps/web/generated/recipes.json"), "utf8")) as RecipeEntry[];
 
-/** What the builder opens with for an integration. */
-function starterConfig(integration: IntegrationId, target: Target, extra: Partial<BuilderConfig> = {}): BuilderConfig {
-  return { ...starter(integration, recipeOptions(RECIPES, CATALOG[integration].recipeGroup)), target, dryRun: true, ...extra };
+/** What the builder writes for its picks: the ones it opens with, and any others given. */
+function picked(integration: IntegrationId, picks: Partial<Picks> = {}): BuilderConfig {
+  return pickedConfig(integration, recipeOptions(RECIPES, CATALOG[integration].recipeGroup), { ...firstPicks(integration), ...picks });
+}
+
+/** Every question the builder offers, with everything it can do on the answer. */
+function everyPick(integration: IntegrationId): { ask: string; act: string }[] {
+  const { picks } = CATALOG[integration];
+  return picks.ask.flatMap((ask) => picks.act.map((act) => ({ ask: ask.event, act: act.do })));
 }
 
 /** Awkward things people type, which must still come out as working code. */
@@ -58,9 +66,20 @@ interface Case {
   config: BuilderConfig;
 }
 
-/** Every integration, source and target: as the builder opens, with everything picked, and with nothing to do. */
+/**
+ * Every integration and target: each of the builder's picks, and for every source, with everything
+ * configured and with nothing to do.
+ */
 function cases(): Case[] {
-  return INTEGRATIONS.flatMap((spec) =>
+  const picks = INTEGRATIONS.flatMap((spec) =>
+    (["local", "users"] as const).flatMap((target) =>
+      everyPick(spec.id).map(({ ask, act }) => ({
+        name: `${spec.id}-${target}-${ask.replace(":", "-")}-${act}`,
+        config: picked(spec.id, { ask, act, target }),
+      })),
+    ),
+  );
+  const configured = INTEGRATIONS.flatMap((spec) =>
     spec.sources.flatMap((source) =>
       (["local", "users"] as const).flatMap((target): Case[] => {
         const questions = [...recipeOptions(RECIPES, spec.recipeGroup).map(recipeQuestion), ...AWKWARD];
@@ -72,7 +91,6 @@ function cases(): Case[] {
         ];
         const name = `${spec.id}-${source.id}-${target}`;
         return [
-          { name: `${name}-starter`, config: starterConfig(spec.id, target, { source: source.id }) },
           {
             name: `${name}-everything`,
             config: { integration: spec.id, source: source.id, sourceValue: SOURCE_VALUES[spec.id], questions, rules, target, dryRun: false, site: "localhost:3000/" },
@@ -85,6 +103,7 @@ function cases(): Case[] {
       }),
     ),
   );
+  return [...picks, ...configured];
 }
 
 const ALL = cases().map((entry) => ({ ...entry, generated: generate(entry.config) }));
@@ -243,20 +262,60 @@ describe("the code the builder writes", () => {
   });
 });
 
-describe("the builder's starting point", () => {
-  it.each(INTEGRATIONS.map((spec) => [spec.id] as const))("keeps every question and rule for %s", (integration) => {
+describe("the builder's picks", () => {
+  it.each(INTEGRATIONS.map((spec) => [spec.id] as const))("only offers questions and actions that work, for %s", (integration) => {
     const spec = CATALOG[integration];
-    const config = starterConfig(integration, "local");
-    expect(config.questions).toHaveLength(spec.starter.questions.length);
-    const code = file(generate(config), "monitor.ts");
-    for (const rule of spec.starter.rules) expect(code).toContain(`.on(${JSON.stringify(rule.event)}, { min: ${rule.min} }`);
-    expect(code).toContain("dryRun: true");
+    const actions = actionsFor(integration, spec.sources[0]!.id).map((action) => action.id);
+    for (const ask of spec.picks.ask) {
+      const events = resolveQuestions(integration, picked(integration, { ask: ask.event }).questions).flatMap((question) => question.events);
+      expect(events, ask.event).toContain(ask.event);
+    }
+    for (const act of spec.picks.act) expect(act.do === "log" || actions.includes(act.do), act.do).toBe(true);
+    // An action that uses the question's name, such as a Gmail label, needs a name for every question.
+    const named = spec.picks.act.some((act) => act.label.includes("{name}") || Object.values(act.values ?? {}).some((value) => value.includes("{name}")));
+    if (named) for (const ask of spec.picks.ask) expect(ask.name?.trim(), ask.event).toBeTruthy();
+  });
+
+  it.each(INTEGRATIONS.map((spec) => [spec.id] as const))("starts %s with one rule on the first question, at 0.8, in dry-run", (integration) => {
+    const code = file(generate(picked(integration)), "monitor.ts");
+    const event = JSON.stringify(CATALOG[integration].picks.ask[0]!.event);
+    expect(code).toContain(`.on(${event}, { min: 0.8 }, `);
+    expect(code.match(/^ {2}\.on\(/gm)).toHaveLength(1);
+    expect(code).toContain("dryRun: true,");
+  });
+
+  it("writes lines that fit the code panel, and marks only code that's there", () => {
+    for (const spec of INTEGRATIONS) {
+      for (const target of ["local", "users"] as const) {
+        for (const min of MINS) {
+          for (const { ask, act } of everyPick(spec.id)) {
+            const name = `${spec.id} ${target} ${ask} ${act} ${min}`;
+            const generated = generate(picked(spec.id, { ask, act, min, target }));
+            for (const output of generated.files) {
+              for (const line of output.code.split("\n")) expect(line.length, `${name} ${output.path}: ${line}`).toBeLessThanOrEqual(81);
+            }
+            // The marks, the question, its rule and what it does, are found line by line.
+            const code = file(generated, target === "local" ? "monitor.ts" : "lib/jev.ts");
+            expect(generated.marks.length, name).toBeGreaterThanOrEqual(3);
+            for (const mark of generated.marks) {
+              expect(mark, name).not.toContain("\n");
+              expect(code, name).toContain(mark);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("names the Gmail label after the question", () => {
+    const code = file(generate(picked("gmail", { ask: "kind:newsletter", act: "label" })), "monitor.ts");
+    expect(code).toContain('.on("kind:newsletter", { min: 0.8 }, google.gmail.label("Newsletter"))');
   });
 
   it("backfills on your machine when the source can, so there's something to see right away", () => {
-    expect(file(generate(starterConfig("gmail", "local")), "monitor.ts")).toContain("source: google.gmail.inbox({ backfill: 5 }),");
-    expect(file(generate(starterConfig("gmail", "users")), "lib/jev.ts")).toContain("source: google.gmail.inbox(),");
-    expect(file(generate(starterConfig("twitch", "local")), "monitor.ts")).toContain("source: twitch.chat(),");
+    expect(file(generate(picked("gmail")), "monitor.ts")).toContain("source: google.gmail.inbox({ backfill: 5 }),");
+    expect(file(generate(picked("gmail", { target: "users" })), "lib/jev.ts")).toContain("source: google.gmail.inbox(),");
+    expect(file(generate(picked("twitch")), "monitor.ts")).toContain("source: twitch.chat(),");
   });
 });
 

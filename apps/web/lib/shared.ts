@@ -6,7 +6,7 @@ export const docsImageRoute = '/og/docs';
 export const docsContentRoute = '/llms.mdx/docs';
 
 export const gitConfig = {
-  user: 'william-popmie',
+  user: 'william-ragnarsson',
   repo: 'jev-events',
   branch: 'main',
   /** Where the docs live inside the repository. */

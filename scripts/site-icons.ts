@@ -2,7 +2,7 @@
  * Draws the site's icons from the mark in apps/web/lib/brand.ts:
  *   apps/web/app/icon.svg        the tab icon
  *   apps/web/app/favicon.ico     16, 32 and 48 px, for browsers and tools that only ask for /favicon.ico
- *   apps/web/app/apple-icon.png  180 px and square, since iOS rounds the corners itself
+ *   apps/web/app/apple-icon.png  180 px, since iOS rounds the corners itself
  *
  * Run `npm run site:icons` after changing the mark; a test fails when icon.svg is stale. It draws
  * with sharp, which Next.js installs.
@@ -47,7 +47,7 @@ const sizes = [16, 32, 48];
 const images = await Promise.all(sizes.map(async (size) => ({ size, data: await png(svg, size).png().toBuffer() })));
 writeFileSync(`${APP}favicon.ico`, ico(images));
 
-// The tile's corners filled in, so the icon is square.
-await png(svg, 180).flatten({ background: BRAND.tile }).png().toFile(`${APP}apple-icon.png`);
+// Without an alpha channel, which iOS would fill with black.
+await png(svg, 180).flatten({ background: BRAND.field }).png().toFile(`${APP}apple-icon.png`);
 
 process.stdout.write("wrote apps/web/app/icon.svg, favicon.ico and apple-icon.png\n");

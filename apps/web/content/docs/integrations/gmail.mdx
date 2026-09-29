@@ -1,7 +1,6 @@
 ---
 title: Gmail
 description: Judge each new email as it arrives, then archive, label, star or trash it, or save a draft reply.
-icon: Mail
 ---
 
 Jev Events checks the inbox, asks Jev your questions about each new email, and runs what you pick on the answers. Choose below, and the code and the steps to run it fill in.
@@ -62,11 +61,12 @@ Jev sees who wrote it, the subject and the new text, plus facts worked out from 
 
 ## Good to know
 
-- **Protected by default.** Native actions skip mail from people at your company and from people you've emailed before. Your company is your address's domain, and public ones such as gmail.com never count. Change it with `protect: { addresses, except }`, or turn it off with `protect: false`. A skipped action says why, for example `colleague at acme.com`.
-- **Nothing is deleted or sent.** The sign-in can't delete mail permanently. `trash()` is the only removal, and it can be undone for 30 days. `draftReply()` leaves a draft for a person to read and send.
-- **One sign-in, Gmail and Calendar.** `google.app()` asks for both. The builder asks only for what its monitor needs, such as `google.app({ scopes: ["gmail"] })`.
-- **A server with one account of your own.** `google.fromEnv()` builds the connection from `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REFRESH_TOKEN`: `await inbox.start({ connections: [google.fromEnv()] })`.
+**Protected by default.** Native actions skip mail from people at your company and from people you've emailed before. Your company is your address's domain, and public ones such as gmail.com never count. Change it with `protect: { addresses, except }`, or turn it off with `protect: false`. A skipped action says why, for example `colleague at acme.com`.
 
-<Callout title="Letting other people connect Gmail" type="warn">
-  While your consent screen is in Testing, only the test users you add can connect, and Google signs them out after 7 days. Before anyone else connects, Google has to verify your app. Gmail's scope is restricted, so it also needs a security assessment every year. Calendar only needs the verification.
-</Callout>
+**Nothing is deleted or sent.** The sign-in can't delete mail permanently. `trash()` is the only removal, and it can be undone for 30 days. `draftReply()` leaves a draft for a person to read and send.
+
+**One sign-in, Gmail and Calendar.** `google.app()` asks for both. The builder asks only for what its monitor needs, such as `google.app({ scopes: ["gmail"] })`.
+
+**A server with one account of your own.** `google.fromEnv()` builds the connection from `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REFRESH_TOKEN`: `await inbox.start({ connections: [google.fromEnv()] })`.
+
+**Letting other people connect Gmail.** While your consent screen is in Testing, only the test users you add can connect, and Google signs them out after 7 days. Before anyone else connects, Google has to verify your app. Gmail's scope is restricted, so it also needs a security assessment every year. Calendar only needs the verification.

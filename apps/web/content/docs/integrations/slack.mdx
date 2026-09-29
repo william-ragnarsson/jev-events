@@ -1,7 +1,6 @@
 ---
 title: Slack
 description: Judge messages in the channels and DMs your Slack app is in, then reply, react or post.
-icon: Hash
 ---
 
 Jev Events reads each new message in the channels your Slack app is in, asks Jev your questions about it, and runs what you pick on the answers. Choose below, and the code and the steps to run it fill in.
@@ -50,7 +49,7 @@ A web app can also use Socket Mode for every workspace that added your app, over
 | `slack.react(emoji)` | Adds a reaction, such as `slack.react("eyes")`. |
 | `slack.post(channel, text?)` | Posts in another channel. By default it says what fired and who wrote what where, with a link to the message. |
 
-`text` can be a string or a function of the event, such as ``(e) => `<@${e.item.author.id}> on it` ``, and Slack formatting such as `*bold*` works. When the app isn't in a channel or lacks a scope, the error says what to type or click to fix it. Actions are [dry-run](/docs/concepts/safety) until you pass `dryRun: false` to `monitor()`.
+`text` can be a string or a function of the event, such as `` (e) => `<@${e.item.author.id}> on it` ``, and Slack formatting such as `*bold*` works. When the app isn't in a channel or lacks a scope, the error says what to type or click to fix it. Actions are [dry-run](/docs/concepts/safety) until you pass `dryRun: false` to `monitor()`.
 
 ## Messages
 
@@ -71,9 +70,14 @@ Jev sees the text and the author's name, plus facts: the channel, and whether it
 
 ## Good to know
 
-- **Skipped before judging.** Joins, edits, the app's own posts and other bots are never judged, so they cost nothing.
-- **Slack wants an answer within 3 seconds.** In a web app, the runtime answers Slack first and judges the message after, through `waitUntil: after` from `next/server`. Keep the route's `maxDuration` long enough to judge.
-- **Retries.** A message that fails for a reason that may pass, such as Slack being down, answers an error so Slack sends it again: 3 times over about 5 minutes. A workspace that removed the app answers OK and is marked `needs-sign-in`.
-- **Keep token rotation off** in your app's settings. The saved bot token has to keep working.
-- **A server with one workspace of your own.** `slack.fromEnv()` builds the connection from `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN`: `await team.start({ connections: [slack.fromEnv()] })`.
-- **Your own manifest.** `manifestUrl({ name, requestUrl, redirectUrls })` makes the link that creates the app with everything filled in, and `manifest()` gives it as an object.
+**Skipped before judging.** Joins, edits, the app's own posts and other bots are never judged, so they cost nothing.
+
+**Slack wants an answer within 3 seconds.** In a web app, the runtime answers Slack first and judges the message after, through `waitUntil: after` from `next/server`. Keep the route's `maxDuration` long enough to judge.
+
+**Retries.** A message that fails for a reason that may pass, such as Slack being down, answers an error so Slack sends it again: 3 times over about 5 minutes. A workspace that removed the app answers OK and is marked `needs-sign-in`.
+
+**Keep token rotation off** in your app's settings. The saved bot token has to keep working.
+
+**A server with one workspace of your own.** `slack.fromEnv()` builds the connection from `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN`: `await team.start({ connections: [slack.fromEnv()] })`.
+
+**Your own manifest.** `manifestUrl({ name, requestUrl, redirectUrls })` makes the link that creates the app with everything filled in, and `manifest()` gives it as an object.
