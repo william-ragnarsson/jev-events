@@ -13,22 +13,19 @@ type Email = {
   yes: boolean;
   /** Where the email is on the desktop tracks when the page loads, in `--u`. */
   wide: [x: number, y: number];
-  /** Where it is in the phone's chute when the page loads, in `--m`. */
-  tall: [x: number, y: number];
 };
 
-// Eight emails spaced evenly along the track, 384u apart on desktop (a 48 s loop at 64u a second)
-// and 96m apart on phones (a 24 s loop at 32m a second). The animations start from these positions,
-// and with reduced motion the emails stay there. The keyframes are in home.css.
+// Eight emails spaced evenly along the track, 384u apart (a 48 s loop at 64u a second). The
+// animations start from these positions, and with reduced motion the emails stay there. The keyframes are in home.css.
 const EMAILS: Email[] = [
-  { subject: 'Deck for Monday?', score: '0.88', yes: true, wide: [304.8, 0], tall: [0, 60] },
-  { subject: 'Invoice 4471 is ready', score: '0.07', yes: false, wide: [688.8, 0], tall: [0, 156] },
-  { subject: 'Re: contract redlines', score: '0.93', yes: true, wide: [1072.8, -101.56], tall: [33.29, 252] },
-  { subject: 'The Weekly Digest #212', score: '0.01', yes: false, wide: [1456.8, 0], tall: [0, 348] },
-  { subject: 'Offsite headcount', score: '0.91', yes: true, wide: [1840.8, -200], tall: [88, 444] },
-  { subject: 'Coffee next week?', score: '0.62', yes: false, wide: [2224.8, 0], tall: [0, 540] },
-  { subject: 'Can you approve the PO?', score: '0.90', yes: true, wide: [2608.8, -200], tall: [88, 636] },
-  { subject: 'PR #1042 merged', score: '0.03', yes: false, wide: [2992.8, 0], tall: [0, 732] },
+  { subject: 'Deck for Monday?', score: '0.88', yes: true, wide: [304.8, 0] },
+  { subject: 'Invoice 4471 is ready', score: '0.07', yes: false, wide: [688.8, 0] },
+  { subject: 'Re: contract redlines', score: '0.93', yes: true, wide: [1072.8, -101.56] },
+  { subject: 'The Weekly Digest #212', score: '0.01', yes: false, wide: [1456.8, 0] },
+  { subject: 'Offsite headcount', score: '0.91', yes: true, wide: [1840.8, -200] },
+  { subject: 'Coffee next week?', score: '0.62', yes: false, wide: [2224.8, 0] },
+  { subject: 'Can you approve the PO?', score: '0.90', yes: true, wide: [2608.8, -200] },
+  { subject: 'PR #1042 merged', score: '0.03', yes: false, wide: [2992.8, 0] },
 ];
 
 export function Hero() {
@@ -46,7 +43,6 @@ export function Hero() {
           <Ctas />
         </div>
         <Tracks />
-        <Chute />
       </div>
     </section>
   );
@@ -86,52 +82,10 @@ function Tracks() {
   );
 }
 
-/** Phones and tablets: the same, turned on its side. The emails drop in, and the ones that need a reply shift over. */
-function Chute() {
-  return (
-    <div className="chute-wrap" role="img" aria-label={DESCRIPTION}>
-      <p className="chute-question">{QUESTION}</p>
-      <p className="chute-new">New emails ↓</p>
-      <div className="chute">
-        <svg className="chute-lines" viewBox="0 0 320 410" aria-hidden="true">
-          <path d="M116 0 V190" className="track" strokeWidth="4" />
-          <path d="M116 190 V410" className="track track-faint" strokeWidth="2" />
-          <path d="M116 190 C116 238 204 238 204 286 V410" className="track" strokeWidth="4" />
-        </svg>
-        <div className="chute-window chute-in">
-          {EMAILS.map((email) => (
-            <span key={email.subject} className={chip('chute-chip', email)} style={tall(email)}>
-              {email.subject}
-            </span>
-          ))}
-        </div>
-        <div className="chute-window chute-out">
-          {EMAILS.map((email) => (
-            <span key={email.subject} className={chip('chute-chip', email)} style={tall(email)}>
-              <span>{email.subject}</span>
-              <span className="chute-score">{email.score}</span>
-            </span>
-          ))}
-        </div>
-        <span className="chute-bar" />
-        <span className="chute-jev">Jev</span>
-      </div>
-      <ul className="chute-legend">
-        <li className="chute-legend-yes">0.85 or more → label “Reply today”</li>
-        <li className="chute-legend-no">Under 0.85 → left alone</li>
-      </ul>
-    </div>
-  );
-}
-
 function chip(base: string, email: Email) {
   return email.yes ? `${base} is-yes` : `${base} is-no`;
 }
 
 function wide({ wide: [x, y] }: Email) {
   return { '--x': x, '--y': y, animationDelay: `${-x / 64}s` } as CSSProperties;
-}
-
-function tall({ tall: [x, y] }: Email) {
-  return { '--x': x, '--y': y, animationDelay: `${-y / 32}s` } as CSSProperties;
 }

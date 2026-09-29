@@ -1,6 +1,6 @@
 /* The home page: the blue hero with its two tracks, How it works, Works with, and the blue close.
    The hero's drawing is laid out in u, one pixel of the 1440-wide design, so it scales with the page
-   (up to 1.25px); on phones and tablets it turns into the chute, laid out in m. Everything that moves
+   (up to 1.25px); below 1040px it is left out. Everything that moves
    has its still frame as its base style, which is what reduced motion shows. */
 main.home {
   container-type: inline-size;
@@ -270,184 +270,6 @@ main.home {
   100% { transform: translate(calc(3072 * var(--u)), calc(-200 * var(--u))); }
 }
 
-/* Phones and tablets: the same, turned on its side. */
-.chute-wrap {
-  display: none;
-}
-
-.chute-question {
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.chute-new {
-  margin-top: 4px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.chute {
-  position: relative;
-  width: calc(320 * var(--m));
-  height: calc(410 * var(--m));
-  margin-top: 12px;
-}
-
-.chute-lines {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.chute-window {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  overflow: hidden;
-}
-
-.chute-in {
-  top: 0;
-  height: calc(150 * var(--m));
-}
-
-.chute-out {
-  top: calc(150 * var(--m));
-  height: calc(260 * var(--m));
-}
-
-.chute-chip {
-  position: absolute;
-  top: calc(-40 * var(--m));
-  left: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: calc(10 * var(--m));
-  width: calc(232 * var(--m));
-  height: calc(40 * var(--m));
-  padding: 0 calc(14 * var(--m));
-  background: var(--color-field);
-  box-shadow: inset 0 0 0 1.5px var(--color-cream);
-  font-size: calc(13 * var(--m));
-  font-weight: 500;
-  white-space: nowrap;
-  transform: translate(calc(var(--x) * var(--m)), calc(var(--y) * var(--m)));
-  animation: chute-no 24s linear infinite;
-}
-
-.chute-chip.is-yes {
-  animation-name: chute-yes;
-}
-
-.chute-out .chute-chip {
-  top: calc(-190 * var(--m));
-}
-
-.chute-out .is-yes {
-  background: var(--color-cream);
-  box-shadow: none;
-  color: var(--color-field);
-}
-
-.chute-out .is-no {
-  box-shadow: inset 0 0 0 1.5px rgb(244 239 230 / 0.5);
-  color: rgb(244 239 230 / 0.72);
-}
-
-.chute-score {
-  font-family: var(--font-mono);
-  font-size: calc(12 * var(--m));
-  font-weight: 500;
-}
-
-.chute-bar {
-  position: absolute;
-  top: calc(148 * var(--m));
-  left: calc(-12 * var(--m));
-  width: calc(256 * var(--m));
-  height: calc(4 * var(--m));
-  background: var(--color-cream);
-}
-
-.chute-jev {
-  position: absolute;
-  top: calc(136 * var(--m));
-  left: calc(244 * var(--m));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: calc(56 * var(--m));
-  height: calc(28 * var(--m));
-  background: var(--color-cream);
-  color: var(--color-field);
-  font-size: calc(15 * var(--m));
-  font-weight: 800;
-}
-
-.chute-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 16px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.chute-legend li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.chute-legend li::before {
-  content: '';
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-}
-
-.chute-legend-yes::before {
-  background: var(--color-cream);
-}
-
-.chute-legend-no {
-  color: rgb(244 239 230 / 0.72);
-}
-
-.chute-legend-no::before {
-  box-shadow: inset 0 0 0 1.5px rgb(244 239 230 / 0.5);
-}
-
-/* 32m a second, 96m between emails: a 24 s loop. */
-@keyframes chute-no {
-  from {
-    transform: translate(0, 0);
-  }
-  to {
-    transform: translate(0, calc(768 * var(--m)));
-  }
-}
-
-@keyframes chute-yes {
-  0% { transform: translate(0, 0); }
-  27.34% { transform: translate(0, calc(210 * var(--m))); }
-  29.04% { transform: translate(calc(2.46 * var(--m)), calc(223.06 * var(--m))); }
-  30.44% { transform: translate(calc(9.15 * var(--m)), calc(233.81 * var(--m))); }
-  31.62% { transform: translate(calc(19.01 * var(--m)), calc(242.83 * var(--m))); }
-  32.64% { transform: translate(calc(30.98 * var(--m)), calc(250.7 * var(--m))); }
-  33.59% { transform: translate(calc(44 * var(--m)), calc(258 * var(--m))); }
-  34.54% { transform: translate(calc(57.02 * var(--m)), calc(265.3 * var(--m))); }
-  35.57% { transform: translate(calc(68.99 * var(--m)), calc(273.17 * var(--m))); }
-  36.74% { transform: translate(calc(78.85 * var(--m)), calc(282.19 * var(--m))); }
-  38.14% { transform: translate(calc(85.54 * var(--m)), calc(292.94 * var(--m))); }
-  39.84% { transform: translate(calc(88 * var(--m)), calc(306 * var(--m))); }
-  100% { transform: translate(calc(88 * var(--m)), calc(768 * var(--m))); }
-}
-
 @media (max-width: 1039px) {
   main.home,
   .hero-body {
@@ -483,12 +305,6 @@ main.home {
   .tracks {
     display: none;
   }
-
-  .chute-wrap {
-    --m: min(1.25px, (100cqw - 2 * var(--gutter)) / 320);
-    display: block;
-    margin-top: 56px;
-  }
 }
 
 @media (max-width: 639px) {
@@ -503,10 +319,6 @@ main.home {
   .hero-body {
     padding-bottom: 48px;
   }
-
-  .chute-wrap {
-    margin-top: 44px;
-  }
 }
 
 /* ---------- The sections on paper ---------- */
@@ -516,8 +328,6 @@ main.home {
 }
 
 .home-heading {
-  padding-top: 24px;
-  border-top: 2px solid var(--color-ink);
   font-size: clamp(44px, 12cqw, 80px);
   font-weight: 800;
   line-height: 1;
@@ -931,11 +741,17 @@ main.home {
   91.25%, 100% { transform: translateY(0); }
 }
 
+/* Stacked, the code and the inbox sit centred and close together, without the notes between them. */
 @media (max-width: 1279px) {
   .hiw-panels {
     flex-direction: column;
-    gap: 48px;
+    gap: 24px;
     max-width: 652px;
+    margin-inline: auto;
+  }
+
+  .hiw-note {
+    display: none;
   }
 
   .hiw-col-code,
@@ -946,8 +762,42 @@ main.home {
   }
 }
 
+/* ---------- The logo band under the hero ---------- */
+
+.logo-band {
+  padding: 40px var(--gutter);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.logo-band ul {
+  display: grid;
+  grid-template-columns: repeat(12, auto);
+  justify-content: space-between;
+  gap: 32px 16px;
+}
+
+.logo-band li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: var(--color-ink-2);
+  font-size: 14px;
+  line-height: 1.25;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.logo-band svg {
+  width: 30px;
+  height: 30px;
+  color: var(--color-ink);
+}
+
 /* ---------- Works with ---------- */
 
+/* Each card spans three rows of the grid (logo, name, what it does) and shares them with its
+   neighbours, so the names and descriptions line up across a row whatever wraps. */
 .apps {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -957,24 +807,33 @@ main.home {
 }
 
 .apps li {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  height: 168px;
-  padding: 28px;
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  row-gap: 8px;
+  justify-items: center;
+  padding: 24px 16px;
   border-right: 1px solid rgb(17 17 17 / 0.2);
   border-bottom: 1px solid rgb(17 17 17 / 0.2);
+  text-align: center;
 }
 
 .apps svg {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 8px;
 }
 
 .apps span {
   font-size: 17px;
   font-weight: 700;
   line-height: 1.2;
+}
+
+.apps small {
+  color: var(--color-grey);
+  font-size: 15px;
+  line-height: 1.3;
 }
 
 .apps-custom {
@@ -1099,6 +958,12 @@ main.home {
 
 /* ---------- Smaller screens ---------- */
 
+@media (max-width: 1199px) {
+  .logo-band ul {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
 @media (max-width: 1023px) {
   .home-section {
     padding-top: 112px;
@@ -1106,10 +971,6 @@ main.home {
 
   .apps {
     grid-template-columns: repeat(4, 1fr);
-  }
-
-  .apps li {
-    height: 150px;
   }
 
   .closing {
@@ -1184,14 +1045,33 @@ main.home {
     margin-top: 48px;
   }
 
+  .logo-band {
+    padding: 32px var(--gutter);
+  }
+
+  .logo-band ul {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 28px 4px;
+  }
+
+  .logo-band li {
+    gap: 10px;
+    font-size: 12px;
+    white-space: normal;
+  }
+
+  .logo-band svg {
+    width: 26px;
+    height: 26px;
+  }
+
   .apps {
     grid-template-columns: repeat(2, 1fr);
     margin-top: 40px;
   }
 
   .apps li {
-    height: 120px;
-    padding: 20px;
+    padding: 20px 12px;
   }
 
   .apps svg {
