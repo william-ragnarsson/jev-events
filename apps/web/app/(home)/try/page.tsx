@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 
-import { TryIt } from '@/components/landing/try-it';
+import { Footer } from '@/components/site/footer';
+import { Nav } from '@/components/site/nav';
+import { TryIt } from '@/components/try/try-it';
 import { site } from '@/lib/site';
 
 const title = 'Try it in your browser';
@@ -16,8 +18,12 @@ export const metadata: Metadata = {
 
 export default function TryPage() {
   return (
-    <main>
-      <TryIt />
-    </main>
+    <>
+      <Nav current="/try" />
+      <main id="main" className="try">
+        <TryIt />
+      </main>
+      <Footer onPaper />
+    </>
   );
 }

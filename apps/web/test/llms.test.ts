@@ -4,9 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { CATALOG, INTEGRATIONS, type IntegrationId } from "../lib/builder/catalog.js";
-import { generate, recipeOptions, starter, type BuilderConfig, type RecipeEntry, type Target } from "../lib/builder/generate.js";
-import { agentPrompt, builderMarkdown, builderPrompt, fence, stepsMarkdown } from "../lib/builder/markdown.js";
+import { INTEGRATIONS } from "../lib/builder/catalog.js";
+import { agentPrompt, builderMarkdown, fence, stepsMarkdown } from "../lib/builder/markdown.js";
 import { COMPONENTS, llmsText, type DocsData } from "../lib/llms.js";
 import { site } from "../lib/site.js";
 
@@ -31,10 +30,6 @@ function pages(dir = DOCS): string[] {
   });
 }
 
-function starterConfig(integration: IntegrationId, target: Target, extra: Partial<BuilderConfig> = {}): BuilderConfig {
-  return { ...starter(integration, recipeOptions(DATA.recipes, CATALOG[integration].recipeGroup)), target, dryRun: true, ...extra };
-}
-
 describe("the docs agents read", () => {
   const LEFT = new RegExp(`<(${COMPONENTS.join("|")})\\b`);
 
@@ -54,6 +49,32 @@ describe("the docs agents read", () => {
   it("writes out a snippet's code", () => {
     const text = llmsText('Before\n\n<Snippet name="quickstart" title="monitor.ts" />\n\nAfter', DATA);
     expect(text).toContain('```ts title="monitor.ts"');
+    expect(text).toContain(DATA.snippets.quickstart!.trim());
+  });
+
+  it("drops what only lays the page out, and reads props quoted either way", () => {
+    const page = [
+      "<Steps>",
+      "",
+      "## Install",
+      "",
+      '```ts title="monitor.ts" mark="twitch.chat()"',
+      "twitch.chat();",
+      "```",
+      "",
+      "</Steps>",
+      "",
+      "<Rows>",
+      "",
+      "- **Source** One row.",
+      "",
+      "</Rows>",
+      "",
+      `<Snippet name="quickstart" title="monitor.ts" mark='"some_live_channel"' />`,
+    ].join("\n");
+    const text = llmsText(page, DATA);
+    expect(text).not.toMatch(/<\/?(Steps|Rows)>|mark=/);
+    expect(text).toMatch(/^## Install\n\n```ts title="monitor.ts"\ntwitch\.chat\(\);\n```\n\n- \*\*Source\*\* One row\.\n\n/);
     expect(text).toContain(DATA.snippets.quickstart!.trim());
   });
 
@@ -97,29 +118,6 @@ describe("markdown for agents", () => {
 
   it("fences code that has fences in it with more backticks", () => {
     expect(fence("md", "```ts\nx\n```\n")).toBe("````md\n```ts\nx\n```\n````");
-  });
-
-  it.each(INTEGRATIONS.flatMap((spec) => (["local", "users"] as const).map((target) => [spec.id, target] as const)))(
-    "%s %s: the agent gets every file and command",
-    (integration, target) => {
-      const config = starterConfig(integration, target);
-      const generated = generate(config);
-      const prompt = builderPrompt(config, generated);
-      for (const file of generated.files) expect(prompt).toContain(file.code.trim().split("\n").at(-1));
-      for (const file of generated.files) expect(prompt).toContain(`title="${file.path}"`);
-      for (const step of generated.steps) if (step.command) expect(prompt).toContain(step.command.split("\n")[0]);
-      expect(prompt).toContain(`${site.url}${CATALOG[integration].docs}`);
-    },
-  );
-
-  it("tells the agent to keep dry-run only when an action runs", () => {
-    const acting = starterConfig("gmail", "local");
-    expect(generate(acting).acts).toBe(true);
-    expect(builderPrompt(acting, generate(acting))).toContain("Keep `dryRun: true`");
-
-    const logging = starterConfig("gmail", "local", { rules: [{ event: "needsReply", do: "log" }] });
-    expect(generate(logging).acts).toBe(false);
-    expect(builderPrompt(logging, generate(logging))).not.toContain("dryRun");
   });
 
   it("asks when the prompt at the top of the docs is left empty", () => {

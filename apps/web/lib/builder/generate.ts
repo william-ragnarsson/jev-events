@@ -58,6 +58,8 @@ export interface Generated {
   steps: Step[];
   /** Whether a native action runs, so `dryRun` matters. */
   acts: boolean;
+  /** The code the choices wrote, such as the question and its action, to mark where it appears. */
+  marks: string[];
 }
 
 /** A recipe as `generated/recipes.json` lists it. */
@@ -93,29 +95,42 @@ export function recipeQuestion(recipe: RecipeOption): QuestionConfig {
   return { kind: 'recipe', id: recipe.id, type: recipe.type, labels: recipe.labels };
 }
 
-/** What the builder starts with for an integration. */
-export function starter(integration: IntegrationId, recipes: readonly RecipeOption[]): Pick<BuilderConfig, 'integration' | 'source' | 'sourceValue' | 'questions' | 'rules'> {
+/** What's picked in the builder: a question from the catalog's picks, how sure Jev has to be, and what to do. */
+export interface Picks {
+  /** The question's event, such as "kind:newsletter". */
+  ask: string;
+  /** What to do: an action's id, or "log" for your own code. */
+  act: string;
+  min: number;
+  target: Target;
+}
+
+/** How sure Jev has to be, as the builder offers it. */
+export const MINS = [0.7, 0.8, 0.9] as const;
+
+/** What the builder starts with: the first question and the first thing to do, at 0.8. */
+export function firstPicks(integration: IntegrationId, target: Target = 'local'): Picks {
+  const { picks } = CATALOG[integration];
+  return { ask: picks.ask[0]!.event, act: picks.act[0]!.do, min: 0.8, target };
+}
+
+/** The builder's picks as a configuration: one question, and one thing to do on its answer. */
+export function pickedConfig(integration: IntegrationId, recipes: readonly RecipeOption[], picks: Picks): BuilderConfig {
   const spec = CATALOG[integration];
+  const ask = spec.picks.ask.find((pick) => pick.event === picks.ask) ?? spec.picks.ask[0]!;
+  const act = spec.picks.act.find((pick) => pick.do === picks.act) ?? spec.picks.act[0]!;
   const source = spec.sources[0]!;
+  const { question } = ask;
+  const recipe = 'recipe' in question ? recipes.find((option) => option.id === question.recipe) : undefined;
+  const values = Object.fromEntries(Object.entries(act.values ?? {}).map(([key, value]) => [key, value.replaceAll('{name}', ask.name ?? '')]));
   return {
     integration,
     source: source.id,
     sourceValue: source.param?.default ?? '',
-    questions: spec.starter.questions.flatMap((question): QuestionConfig[] => {
-      if ('recipe' in question) {
-        const recipe = recipes.find((option) => option.id === question.recipe);
-        return recipe ? [recipeQuestion(recipe)] : [];
-      }
-      if ('noul' in question) return [{ kind: 'noul', id: question.id, text: question.noul }];
-      return [{ kind: 'choice', id: question.id, text: question.choice, labels: question.labels }];
-    }),
-    rules: spec.starter.rules.map((rule) => ({
-      event: rule.event,
-      ...(rule.min !== undefined ? { min: rule.min } : {}),
-      ...(rule.review !== undefined ? { review: rule.review } : {}),
-      do: rule.do,
-      values: rule.values ?? {},
-    })),
+    questions: 'recipe' in question ? (recipe ? [recipeQuestion(recipe)] : []) : [{ kind: 'noul', id: question.id, text: question.noul }],
+    rules: [{ event: ask.event, min: picks.min, do: act.do, values }],
+    target: picks.target,
+    dryRun: true,
   };
 }
 
@@ -256,6 +271,8 @@ interface Context {
   source: SourceSpec;
   questions: ResolvedQuestion[];
   rules: ResolvedRule[];
+  /** Filled in as the monitor's code is written. */
+  marks: string[];
 }
 
 /** The files and setup steps for a builder configuration. */
@@ -263,10 +280,10 @@ export function generate(config: BuilderConfig): Generated {
   const spec = CATALOG[config.integration];
   const source = spec.sources.find((candidate) => candidate.id === config.source) ?? spec.sources[0]!;
   const questions = resolveQuestions(config.integration, config.questions);
-  const context: Context = { config: { ...config, source: source.id }, spec, source, questions, rules: [] };
+  const context: Context = { config: { ...config, source: source.id }, spec, source, questions, rules: [], marks: [] };
   context.rules = resolveRules(context.config, questions);
   const { files, steps } = config.target === 'local' ? local(context) : users(context);
-  return { files, steps, acts: context.rules.some((rule) => rule.action) };
+  return { files, steps, acts: context.rules.some((rule) => rule.action), marks: context.marks };
 }
 
 function coreImports(context: Context, extra: readonly string[]): string {
@@ -277,46 +294,50 @@ function coreImports(context: Context, extra: readonly string[]): string {
 
 /** `const <variable> = monitor({ … }).on(…)` */
 function monitorCode(context: Context): string[] {
-  const { config, spec, source, questions, rules } = context;
+  const { config, spec, source, questions, rules, marks } = context;
   const backfill = config.target === 'local' && source.backfill ? BACKFILL : undefined;
   const lines = [`const ${source.variable} = monitor({`];
   if (backfill) lines.push(`  // ${source.backfill}, so there's something to see right away.`);
   lines.push(`  source: ${source.code(config.sourceValue ?? '', backfill)},`);
   lines.push('  questions: {');
-  for (const question of questions) lines.push(`    ${question.id}: ${question.code.replaceAll('\n', '\n    ')},`);
+  for (const question of questions) {
+    lines.push(`    ${question.id}: ${question.code.replaceAll('\n', '\n    ')},`);
+    marks.push(`${question.id}: ${question.code.split('\n')[0]}`);
+  }
   lines.push('  },');
   if (rules.some((rule) => rule.action)) {
     lines.push(
       config.dryRun
-        ? '  // Native actions only log what they would do. Set dryRun: false once the answers look right.'
-        : '  // Native actions run for real. Set dryRun: true to only log what they would do.',
+        ? '  // Native actions only log what they would do until you set dryRun: false.'
+        : "  // Native actions run for real. Set dryRun: true to only log what they'd do.",
     );
     lines.push(`  dryRun: ${config.dryRun},`);
   }
 
-  // What your own code prints: "[needsReply] Q3 deck (from dana@acme.com)".
-  const who = config.target === 'users' ? ' for ${e.connection?.userId}:' : '';
-  const print = (label: string, more = '') => `(e) => console.log(\`[${label}]${who} ${spec.describeItem}\`${more})`;
+  // Your own code, which prints what it's given, such as "[needsReply] Q3 deck".
+  const who = config.target === 'users' ? '${e.connection?.userId}: ' : '';
+  const handler = (label: string, note: string, more = '') => {
+    const print = `console.log(\`[${label}] ${who}${spec.describeItem}\`${more})`;
+    marks.push(print);
+    return [`(e) => {`, `    // ${note}`, `    ${print};`, '  }'].join('\n');
+  };
 
   const handlers: string[] = [];
-  let explained = false;
   for (const rule of rules) {
-    if (!rule.action && !explained) {
-      handlers.push(`  // Your own code: e.item is the ${spec.noun}, and e.answers has every answer.`);
-      explained = true;
-    }
     const policy = [...(rule.min !== undefined ? [`min: ${rule.min}`] : []), ...(rule.review !== undefined ? [`review: ${rule.review}`] : [])];
-    handlers.push(`  .on(${str(rule.event)}, ${policy.length > 0 ? `{ ${policy.join(', ')} }, ` : ''}${rule.action ?? print(rule.event)})`);
+    const on = `${str(rule.event)}${policy.length > 0 ? `, { ${policy.join(', ')} }` : ''}`;
+    marks.push(on);
+    if (rule.action) marks.push(rule.action);
+    const run = rule.action ?? handler(rule.event, `Your own code: e.item is the ${spec.noun}, and e.answers has every answer.`);
+    handlers.push(`  .on(${on}, ${run})`);
   }
   if (rules.some((rule) => rule.review !== undefined)) {
-    handlers.push('  // Unsure answers, between review and min.');
-    handlers.push(`  .on("review", ${print('review: ${e.trigger.event}')})`);
+    handlers.push(`  .on("review", ${handler('review: ${e.trigger.event}', 'Unsure answers, between review and min. e.trigger says which.')})`);
   }
   if (rules.length === 0) {
-    handlers.push(`  // Every ${spec.noun} Jev judged, with its answers.`);
-    handlers.push(`  .on("judged", ${print('judged', ', e.answers')})`);
+    handlers.push(`  .on("judged", ${handler('judged', `Every ${spec.noun} Jev judged, with its answers.`, ', e.answers')})`);
   }
-  lines.push('})', ...handlers);
+  lines.push('})', ...handlers.flatMap((code) => code.split('\n')));
   lines[lines.length - 1] += ';';
   return lines;
 }
@@ -334,7 +355,7 @@ function outcome(context: Context, show: (what: string) => string): string {
   ].join(' ');
 }
 
-function local(context: Context): Omit<Generated, 'acts'> {
+function local(context: Context): Pick<Generated, 'files' | 'steps'> {
   const { config, spec, source } = context;
   const code = [
     coreImports(context, []),
@@ -364,7 +385,7 @@ function local(context: Context): Omit<Generated, 'acts'> {
   };
 }
 
-function users(context: Context): Omit<Generated, 'acts'> {
+function users(context: Context): Pick<Generated, 'files' | 'steps'> {
   const { config, spec, source } = context;
   const stream = spec.delivery === 'stream';
   const site = siteUrl(config.site);
@@ -382,16 +403,18 @@ function users(context: Context): Omit<Generated, 'acts'> {
     '',
     'export const jev = runtime({',
     `  monitors: [${source.variable}],`,
-    "  // Every connection, its tokens (encrypted with JEV_EVENTS_KEY) and where it's up to.",
+    '  // Every connection, its tokens (encrypted with JEV_EVENTS_KEY)',
+    "  // and where it's up to.",
     '  store: postgresStore(new Pool({ connectionString: process.env.DATABASE_URL })),',
     `  // Reads ${list(spec.env.map((variable) => variable.name))}.`,
     `  apps: [${spec.app}],`,
     '  signIn: {',
-    "    // Who's signed in to your product. Replace this with your auth library's session lookup, such as",
-    '    // `async () => (await auth())?.user?.id`. Until then, connect links answer 401.',
+    "    // Who's signed in to your product. Replace this with your auth library's",
+    '    // session lookup, such as `async () => (await auth())?.user?.id`.',
+    '    // Until then, connect links answer 401.',
     '    user: async () => undefined,',
     '  },',
-    ...(webhook ? ['  // Judges each message after Slack has its answer, which it wants within 3 seconds.', '  waitUntil: after,'] : []),
+    ...(webhook ? ['  // Slack wants an answer within 3 seconds, so each message is judged after.', '  waitUntil: after,'] : []),
     '});',
     '',
   ].join('\n');
@@ -402,7 +425,7 @@ function users(context: Context): Omit<Generated, 'acts'> {
     'export const GET = jev.handle;',
     'export const POST = jev.handle;',
     ...(spec.delivery === 'poll'
-      ? ['', '// Seconds this function may run. A cron call stops checking after 50, so this leaves room.', 'export const maxDuration = 60;']
+      ? ['', '// Seconds this function may run. A cron call stops checking after 50,', '// so this leaves room.', 'export const maxDuration = 60;']
       : webhook
         ? ['', '// Seconds this function may run, including judging after Slack has its answer.', 'export const maxDuration = 60;']
         : []),
@@ -416,9 +439,10 @@ function users(context: Context): Omit<Generated, 'acts'> {
     'DATABASE_URL=',
     '# Encrypts tokens in the database. Print one with: npx jev-events key',
     'JEV_EVENTS_KEY=',
-    ...(spec.delivery === 'poll' ? ['# Any long random string. The cron job sends it as Authorization: Bearer <CRON_SECRET>', 'CRON_SECRET='] : []),
+    ...(spec.delivery === 'poll' ? ['# Any long random string. The cron job sends it as', '# Authorization: Bearer <CRON_SECRET>', 'CRON_SECRET='] : []),
     ...spec.env.flatMap((variable) => [...(variable.comment ? [`# ${variable.comment}`] : []), `${variable.name}=`]),
-    '# Where /api/jev is served. Only needed for connectUrl(), or when a proxy changes the host',
+    '# Where /api/jev is served. Only needed for connectUrl(),',
+    '# or when a proxy changes the host',
     `# JEV_EVENTS_URL=${base}`,
     '',
   ].join('\n');
@@ -437,8 +461,9 @@ function users(context: Context): Omit<Generated, 'acts'> {
       code: [
         'import { jev } from "./lib/jev";',
         '',
-        "// Chat needs a connection that stays open, which serverless functions can't hold. This process",
-        '// keeps one open for every connected account, and picks up new connections by itself.',
+        "// Chat needs a connection that stays open, which serverless functions can't",
+        '// hold. This process keeps one open for every connected account, and picks',
+        '// up new connections by itself.',
         'jev.start().catch((error: unknown) => {',
         '  console.error(error);',
         '  process.exit(1);',

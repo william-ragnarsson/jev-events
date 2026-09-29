@@ -1,7 +1,6 @@
 ---
 title: Google Calendar
 description: Judge new invites and events as they arrive, then accept, decline or answer maybe.
-icon: CalendarDays
 ---
 
 Jev Events checks the calendar, asks Jev your questions about each new invite or event, and runs what you pick on the answers. Choose below, and the code and the steps to run it fill in.
@@ -65,10 +64,10 @@ Jev sees the title, when it starts and the description, plus facts: how soon it 
 
 ## Good to know
 
-- **Protected by default.** Native actions never answer invites from people at your company, or from people you've emailed before. Change it with `protect: { addresses, except }`, or turn it off with `protect: false`. A skipped action says why, for example `colleague at acme.com`.
-- **One sign-in, Gmail and Calendar.** `google.app()` asks for both. The builder asks only for what its monitor needs, such as `google.app({ scopes: ["calendar"] })`.
-- **A server with one account of your own.** `google.fromEnv()` builds the connection from `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REFRESH_TOKEN`: `await invites.start({ connections: [google.fromEnv()] })`.
+**Protected by default.** Native actions never answer invites from people at your company, or from people you've emailed before. Change it with `protect: { addresses, except }`, or turn it off with `protect: false`. A skipped action says why, for example `colleague at acme.com`.
 
-<Callout title="Letting other people connect their calendar" type="warn">
-  While your consent screen is in Testing, only the test users you add can connect, and Google signs them out after 7 days. Before anyone else connects, publish the app and have Google verify it.
-</Callout>
+**One sign-in, Gmail and Calendar.** `google.app()` asks for both. The builder asks only for what its monitor needs, such as `google.app({ scopes: ["calendar"] })`.
+
+**A server with one account of your own.** `google.fromEnv()` builds the connection from `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `GOOGLE_REFRESH_TOKEN`: `await invites.start({ connections: [google.fromEnv()] })`.
+
+**Letting other people connect their calendar.** While your consent screen is in Testing, only the test users you add can connect, and Google signs them out after 7 days. Before anyone else connects, publish the app and have Google verify it.

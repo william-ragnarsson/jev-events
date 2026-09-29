@@ -20,6 +20,7 @@ import {
   LIMITS,
   parseTryRequest,
   RECENT,
+  TRY_QUESTIONS,
   tryCode,
   type TryQuestion,
   type TryResult,
@@ -140,6 +141,10 @@ describe("what the route asks Jev", () => {
   it("offers the chat recipes that need nothing more", () => {
     expect(OPTIONS.map((option) => option.id)).toEqual(["kind", "hateful", "question", "streamIssue", "spam"]);
     expect(OPTIONS[0]?.labels).toEqual(Object.keys(recipes.chat.kind.criteria));
+  });
+
+  it("puts the ones that answer yes or no on the page", () => {
+    for (const { id } of TRY_QUESTIONS) expect(OPTIONS.find((option) => option.id === id)?.type).toBe("noul");
   });
 
   it("is what a monitor on twitchChat() sends, with the three messages before as context", () => {

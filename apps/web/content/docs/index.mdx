@@ -1,12 +1,7 @@
 ---
 title: Introduction
 description: Watch inboxes, calendars, chats and any other stream, ask Jev your questions about each new item, and act on the answers.
-icon: BookOpen
 ---
-
-## Set it up with your coding agent
-
-Pick what to watch and what should happen, then paste the prompt into Claude Code, Cursor or any other coding agent. It reads these docs, writes the code, and tells you each step that needs you.
 
 <AgentPrompt />
 
@@ -14,30 +9,16 @@ Pick what to watch and what should happen, then paste the prompt into Claude Cod
 
 Jev Events is an open-source TypeScript library. It watches a stream, such as an inbox, a calendar, a Slack workspace or a Twitch chat, asks [TypeSafe's Jev](https://docs.typesafe.ai) your questions about each new item, and turns the answers into events. You handle each event with a built-in action, such as archiving an email or timing out a chatter, or with your own code.
 
-<Snippet name="hero" title="moderator.ts" />
+<Snippet name="intro" title="monitor.ts" mark='google.gmail.inbox()|kind: recipes.email.kind|"kind:newsletter"|google.gmail.archive()' />
 
-<Steps>
-<Step>
+<Rows>
 
-**Pick a source.** `google.gmail.inbox()`, `slack.messages()`, `twitch.chat()`, a webhook, or any async iterable. Every item has the same small shape, plus typed fields for its platform, such as an email's `subject`.
+- **Source** `google.gmail.inbox()` emits each new email. `slack.messages()`, `twitch.chat()`, a webhook or any async iterable work the same way, and each item has typed fields for its platform, such as an email's `subject`.
+- **Questions** `recipes.email.kind` is a `choice` between labels. A question can also be a yes/no `noul`, or a `score` on your own scale. All of an item's questions go to Jev in one request.
+- **Events** Names come from your questions, so `"kind:newsletter"` exists only because `kind` has a `newsletter` label. A typo is a compile error.
+- **Actions** `google.gmail.archive()` only logs what it would do until you turn dry-run off, and never touches protected people, such as colleagues. Your own functions run as soon as an answer fires.
 
-</Step>
-<Step>
-
-**Ask questions.** A `choice` between labels, a yes/no `noul`, or a `score` on your own scale. All of an item's questions go to Jev in one request.
-
-</Step>
-<Step>
-
-**Handle typed events.** Event names come from your questions, so `"kind:question"` exists only if `kind` has a `question` label, and a typo is a compile error.
-
-</Step>
-<Step>
-
-**Act.** Built-in actions only log what they would do until you turn dry-run off, and never touch protected people, such as colleagues or moderators. Your own functions run as soon as an answer fires.
-
-</Step>
-</Steps>
+</Rows>
 
 ## Two ways to run it
 
@@ -46,32 +27,10 @@ Jev Events is an open-source TypeScript library. It watches a stream, such as an
 | Whose account | Yours, signed in once with `npx jev-events auth` | Each user's, connected from your app |
 | Runs as | A script you start, such as `npx tsx monitor.ts` | Routes in your web app, plus a worker for chat |
 | Tokens are kept | In `.jev-events/` next to your code | In your Postgres database, encrypted |
-| Start with | [Quickstart](/docs/quickstart) | [For your users](/docs/your-users) |
+| Start with | [**Quickstart →**](/docs/quickstart) | [**For your users →**](/docs/your-users) |
 
-Each integration's page has a builder that writes the code for either one. To see what Jev says before writing anything, `npx jev-events watch` prints its answers in your terminal. See [the CLI](/docs/cli).
-
-## Integrations
-
-<Cards>
-  <Card title="Gmail" href="/docs/integrations/gmail" description="Archive, label or star new email, or save a draft reply." />
-  <Card title="Google Calendar" href="/docs/integrations/google-calendar" description="Accept, decline or answer maybe to new invites." />
-  <Card title="Slack" href="/docs/integrations/slack" description="Reply, react or post when a message needs someone." />
-  <Card title="Twitch" href="/docs/integrations/twitch" description="Time out, delete or warn in your chat as it happens." />
-  <Card title="Anything else" href="/docs/integrations/custom" description="Logs, webhooks, queues and public streams such as Bluesky." />
-</Cards>
-
-The [roadmap](/docs/roadmap) lists what's coming next.
-
-## Why it exists
-
-Jev answers narrow, typed questions about text: which of these labels fits, how likely is yes, where on this scale. Input costs $0.042 per million tokens and output is free, which makes it affordable to ask about every single message in a busy inbox or chat.
-
-The call itself is the easy part. Around it you need sign-in for each user, webhooks and schedules, reconnects, rate limits, a queue that skips messages that waited too long, a daily budget, each platform's API, and a guarantee that your bot never times out a moderator. Jev Events is that part, tested once so you don't rebuild it for every project.
+Each integration's page, such as [Gmail](/docs/integrations/gmail), has a builder that writes the code for either one. To see what Jev says before writing anything, `npx jev-events watch` prints its answers in your terminal. See [the CLI](/docs/cli).
 
 ## Where your data goes
 
 Jev Events is a library, not a service. It runs in your own process or web app, with your own TypeSafe key and your own apps on each platform. Items go to TypeSafe's API to be judged, actions go straight to the platform, and tokens stay on your machine or in your database.
-
-<Callout title="A community project">
-  Jev Events is built on TypeSafe's public API. It is not made by, affiliated with or endorsed by TypeSafe.
-</Callout>

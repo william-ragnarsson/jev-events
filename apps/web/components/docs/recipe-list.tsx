@@ -1,5 +1,7 @@
+import { Fragment } from 'react';
+
 import recipes from '@/generated/recipes.json';
-import { cn } from '@/lib/cn';
+import { InlineCode } from './inline-code';
 
 interface Recipe {
   usage: string;
@@ -11,47 +13,43 @@ interface Recipe {
 }
 
 const OUTCOME: Record<string, string> = {
-  choice: 'One event per label',
-  noul: 'Fires above your probability',
-  score: 'Fires at or above your score',
+  choice: 'One label, each its own event',
+  noul: 'Yes or no',
+  score: 'A score on its scale',
 };
 
-/** Every recipe in a group, rendered from the library's own definitions. */
+/** Every recipe in a group on hairlines, rendered from the library's own definitions. */
 export function RecipeList({ group }: { group: string }) {
   const list = (recipes as Recipe[]).filter((recipe) => recipe.group === group);
   return (
-    <div className="not-prose my-6 grid grid-cols-1 gap-4">
+    <div className="docs-recipes">
       {list.map((recipe) => (
-        <article key={recipe.usage} id={`${recipe.group}-${recipe.id}`} className="scroll-mt-24 rounded-xl border bg-fd-card p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <code className="font-mono text-[13px] font-medium">{recipe.usage}</code>
-            <span className="rounded-md border px-1.5 py-0.5 font-mono text-[10px] text-fd-muted-foreground uppercase">
-              {recipe.type}
-            </span>
-            <span className="text-xs text-fd-muted-foreground">{OUTCOME[recipe.type]}</span>
-          </div>
-          <p className="mt-2 text-sm">{String(recipe.instructions)}</p>
+        <section key={recipe.usage} id={`${recipe.group}-${recipe.id}`} className="docs-recipe">
+          <p className="docs-recipe-head">
+            <InlineCode>{recipe.usage}</InlineCode>
+            <span>{OUTCOME[recipe.type]}</span>
+          </p>
+          <p>{String(recipe.instructions)}</p>
           <Criteria type={recipe.type} criteria={recipe.criteria} id={recipe.id} />
-        </article>
+        </section>
       ))}
     </div>
   );
 }
 
+/** What each outcome means: a choice's events, yes and no, or a score's levels. */
 function Criteria({ type, criteria, id }: { type: string; criteria: unknown; id: string }) {
   if (criteria === null || criteria === undefined) return null;
-  const rows: Array<[string, string]> = Array.isArray(criteria)
+  const rows: [string, string][] = Array.isArray(criteria)
     ? criteria.map((level, index) => [String(index), String(level)])
     : Object.entries(criteria as Record<string, unknown>).map(([key, value]) => [key, value === null ? '' : String(value)]);
   return (
-    <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 border-t pt-3 text-[13px]">
+    <dl>
       {rows.map(([key, value]) => (
-        <div key={key} className="contents">
-          <dt className={cn('font-mono text-xs text-fd-muted-foreground', type === 'choice' && 'text-fd-foreground')}>
-            {type === 'choice' ? `"${id}:${key}"` : type === 'score' ? `${key}` : key === 'true' ? 'yes' : 'no'}
-          </dt>
-          <dd className="text-fd-muted-foreground">{value || '—'}</dd>
-        </div>
+        <Fragment key={key}>
+          <dt>{type === 'choice' ? `"${id}:${key}"` : type === 'score' ? key : key === 'true' ? 'yes' : 'no'}</dt>
+          <dd>{value || 'Anything else'}</dd>
+        </Fragment>
       ))}
     </dl>
   );

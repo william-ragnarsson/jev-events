@@ -164,6 +164,17 @@ export const LIMITS = { perSecond: 2, burst: 2, maxQueue: 3, maxLagMs: 3000 } as
 export const EXAMPLE_QUESTION = 'Is this message about the game being played?';
 
 /**
+ * The chat recipes the page offers, in its order and by short names. They all answer yes or no, since
+ * the chat shows Jev's probability of yes. What Jev is asked is the recipe's own question.
+ */
+export const TRY_QUESTIONS = [
+  { id: 'question', label: 'A question for the streamer?' },
+  { id: 'hateful', label: 'Hateful?' },
+  { id: 'spam', label: 'Spam?' },
+  { id: 'streamIssue', label: 'A problem with the stream?' },
+] as const;
+
+/**
  * The monitor that does what the page does, for the channel and question picked. The tests
  * type-check it against the library.
  */

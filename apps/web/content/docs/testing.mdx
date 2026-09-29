@@ -1,7 +1,6 @@
 ---
 title: Testing
 description: Test your monitors without network calls or an API key, using a fake Jev client.
-icon: FlaskConical
 ---
 
 `jev-events/testing` exports `mockJev()`, a fake client that answers from a function you write. Pass it to `monitor()` as `client`, feed items with [`from()`](/docs/concepts/sources#from), and `run()` judges them all and returns the stats. Nothing reaches TypeSafe, so tests need no key and cost nothing.

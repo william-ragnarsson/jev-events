@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { LandingShell } from '@/components/landing/landing';
-
-// The home page and the Try it page share the landing's nav, footer and theme; the docs have their own.
+// The home page and the Try it page. Each page puts in its own nav, since the home page's is on blue.
 export default function HomeLayout({ children }: { children: ReactNode }) {
-  return <LandingShell>{children}</LandingShell>;
+  return <div className="site">{children}</div>;
 }

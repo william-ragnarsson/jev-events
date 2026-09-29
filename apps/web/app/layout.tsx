@@ -1,11 +1,16 @@
 import { Analytics } from '@vercel/analytics/next';
 import { RootProvider } from 'fumadocs-ui/provider/next';
-import { GeistMono } from 'geist/font/mono';
-import { GeistSans } from 'geist/font/sans';
 import type { Metadata, Viewport } from 'next';
+import { Inter, Martian_Mono, Schibsted_Grotesk } from 'next/font/google';
 
+import { BRAND } from '@/lib/brand';
 import { site } from '@/lib/site';
 import './global.css';
+
+const sans = Schibsted_Grotesk({ subsets: ['latin'], variable: '--font-schibsted' });
+const mono = Martian_Mono({ subsets: ['latin'], variable: '--font-martian' });
+// Only the Twitch chat and the Gmail inbox are set in Inter, so it isn't preloaded on every page.
+const ui = Inter({ subsets: ['latin'], variable: '--font-inter', preload: false });
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
@@ -25,17 +30,15 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
-    { media: '(prefers-color-scheme: dark)', color: '#050505' },
-  ],
+  themeColor: BRAND.cream,
 };
 
 export default function Layout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
-      <body className="flex min-h-screen flex-col font-sans antialiased">
-        <RootProvider theme={{ defaultTheme: 'dark' }}>{children}</RootProvider>
+    <html lang="en" className={`${sans.variable} ${mono.variable} ${ui.variable}`}>
+      <body>
+        {/* One light theme; the provider stays for the docs' search dialog. */}
+        <RootProvider theme={{ enabled: false }}>{children}</RootProvider>
         <Analytics />
       </body>
     </html>

@@ -1,0 +1,606 @@
+/* Try it: the form on the left and, beside it, the stream in Twitch's own player over a chat that
+   looks like Twitch's, in Twitch's dark colors, with Jev's answers. On tablets and phones the stream
+   and the chat go under the form. Everything that moves has its still frame as its base style,
+   which is what reduced motion shows. */
+main.try {
+  padding: 16px var(--gutter) 120px;
+
+  --twitch-player: #0e0e10;
+  --twitch-chat: #18181b;
+  --twitch-pinned: #1f1f23;
+  --twitch-line: #35353b;
+  --twitch-text: #efeff1;
+  --twitch-muted: #adadb8;
+  --twitch-error: #ff8280;
+}
+
+/* The stream never grows past 1200px wide, which leaves room at the edge on very wide screens. */
+.try-it {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1200px);
+  justify-content: space-between;
+  gap: 64px;
+  align-items: start;
+}
+
+/* ---------- The form ---------- */
+
+.try-side {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+}
+
+.try-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Two lines in the 360px column. */
+.try-title {
+  font-size: 42px;
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.try-lead {
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--color-ink-2);
+}
+
+.try-form {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.try-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+}
+
+/* While a run is going, the form holds what it's asking. */
+.try-fields:disabled > * {
+  opacity: 0.55;
+}
+
+.try-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.try-label,
+.try-question legend {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.try-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  background: var(--color-paper);
+  border: 2px solid var(--color-ink);
+  font-size: 16px;
+  color: var(--color-ink);
+}
+
+.try-input::placeholder {
+  color: var(--color-grey);
+  opacity: 1;
+}
+
+.try-help {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-ink-2);
+}
+
+.try-help a,
+.try-suggestion {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.try-suggestion:disabled {
+  cursor: default;
+}
+
+.try-help a {
+  white-space: nowrap;
+}
+
+/* The legend floats, so it takes its margin like any other heading. */
+.try-question {
+  min-width: 0;
+}
+
+.try-question legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.try-question legend + * {
+  clear: left;
+}
+
+.try-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.try-option input {
+  appearance: none;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border: 2px solid var(--color-ink);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.try-option input:checked {
+  background: radial-gradient(circle, var(--color-field) 5px, transparent 5.5px);
+}
+
+.try-fields:disabled .try-option,
+.try-fields:disabled .try-option input {
+  cursor: default;
+}
+
+.try-custom {
+  margin: 6px 0 4px;
+  font-size: 15px;
+}
+
+.try-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.try-start {
+  height: 56px;
+  background: var(--color-field);
+  color: var(--color-cream);
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.try-start:hover {
+  background: color-mix(in srgb, var(--color-field) 88%, var(--color-ink));
+}
+
+.try-status {
+  min-height: 21px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-ink-2);
+}
+
+.try-status.is-warn {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+/* ---------- The stream ---------- */
+
+.try-stage {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  scroll-margin-top: 16px;
+}
+
+.try-player {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--twitch-player);
+}
+
+.try-player iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.try-player p {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 0 24px;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  text-align: center;
+  color: var(--twitch-muted);
+}
+
+.try-player svg {
+  width: 32px;
+  height: 32px;
+}
+
+/* ---------- Chat and Code, under the stream ---------- */
+
+.try-screen {
+  scroll-margin-bottom: 16px;
+}
+
+.try-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 20px;
+  border-bottom: 1px solid var(--color-ink);
+}
+
+.try-tablist {
+  display: flex;
+  flex-shrink: 0;
+  gap: 32px;
+}
+
+/* The hidden bold copy keeps a tab as wide as it is when picked, so the tabs don't shift. */
+.try-tab {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  margin-bottom: -1px;
+  border-bottom: 3px solid transparent;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--color-ink-2);
+  cursor: pointer;
+}
+
+.try-tab::after {
+  content: attr(data-text);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: 700;
+}
+
+.try-tab[aria-selected='true'] {
+  border-bottom-color: var(--color-ink);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.try-tab:hover {
+  color: var(--color-ink);
+}
+
+.try-stats {
+  align-self: center;
+  padding: 6px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--color-ink-2);
+}
+
+.try-stats span {
+  white-space: nowrap;
+}
+
+.try-note {
+  margin-top: 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-ink-2);
+}
+
+/* ---------- The chat, in Twitch's colors ---------- */
+
+.try-chat {
+  margin-top: 16px;
+  background: var(--twitch-chat);
+  color: var(--twitch-text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.try-chat ::selection {
+  background: rgb(111 134 255 / 0.4);
+}
+
+.try-chat :focus-visible {
+  outline-color: var(--twitch-text);
+}
+
+.try-chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  border-bottom: 1px solid var(--twitch-line);
+  font-weight: 600;
+}
+
+.try-pinned {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px;
+  padding: 10px 12px;
+  background: var(--twitch-pinned);
+  border: 1px solid var(--twitch-line);
+  border-radius: 6px;
+}
+
+.try-pinned svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+.try-pinned span {
+  color: var(--twitch-muted);
+}
+
+.try-pinned b {
+  font-weight: 600;
+}
+
+/* About ten rows. */
+.try-chat-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 310px;
+}
+
+.try-chat-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 10px;
+  overflow-y: auto;
+  overflow-anchor: none;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: #53535f transparent;
+}
+
+/* The answer lines up with the message's first line. (Lining up their baselines would put it half
+   a pixel lower, as its type is smaller.) */
+.try-row {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 30px;
+  padding: 5px 20px;
+  animation: try-row-in 0.3s ease-out;
+}
+
+/* The first row takes up the room above, so the chat fills up from the bottom. */
+.try-row:first-child {
+  margin-top: auto;
+}
+
+.try-row.is-yes {
+  background: color-mix(in srgb, var(--color-field) 30%, transparent);
+}
+
+.try-row p {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.try-row b {
+  font-weight: 700;
+}
+
+.try-hidden {
+  color: var(--twitch-muted);
+}
+
+.try-show {
+  color: var(--twitch-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.try-show:hover {
+  color: var(--twitch-text);
+}
+
+.try-answer {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--twitch-muted);
+}
+
+.try-yes {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 4px;
+  background: var(--color-field);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.try-asking {
+  font-style: italic;
+  animation: try-asking 1.4s ease-in-out infinite;
+}
+
+.try-failed {
+  color: var(--twitch-error);
+}
+
+.try-chat-empty {
+  margin-top: auto;
+  padding: 5px 20px 15px;
+  color: var(--twitch-muted);
+}
+
+/* Like Twitch's, over the bottom of the chat. */
+.try-paused {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 6px;
+  background: var(--twitch-line);
+  color: var(--twitch-text);
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.4);
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+
+.try-paused:hover {
+  background: #45454d;
+}
+
+@keyframes try-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes try-asking {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ---------- The code ---------- */
+
+.try-code {
+  margin-top: 24px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 22px;
+  color: var(--color-ink);
+}
+
+.try-code-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 28px;
+  margin-top: 20px;
+}
+
+.try-copy {
+  height: 48px;
+  min-width: 164px;
+  padding: 0 20px;
+  border: 2px solid var(--color-ink);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.try-copy:hover {
+  background: var(--color-ink);
+  color: var(--color-cream);
+}
+
+.try-more {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 16px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+
+/* ---------- Tablets and phones: the stream and the chat under the form ---------- */
+
+@media (max-width: 1023px) {
+  main.try {
+    padding-bottom: 96px;
+  }
+
+  .try-it {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 56px;
+  }
+
+  .try-side {
+    max-width: 560px;
+  }
+}
+
+@media (max-width: 639px) {
+  main.try {
+    padding-top: 8px;
+    padding-bottom: 72px;
+  }
+
+  .try-it {
+    gap: 48px;
+  }
+
+  .try-title {
+    font-size: 36px;
+  }
+
+  .try-bar {
+    gap: 16px;
+  }
+
+  .try-tablist {
+    gap: 24px;
+  }
+
+  .try-pinned {
+    margin: 8px;
+  }
+
+  .try-row,
+  .try-chat-empty {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .try-wide {
+    display: none;
+  }
+}

@@ -77,6 +77,8 @@ export interface IntegrationSpec {
   id: IntegrationId;
   /** "Gmail" */
   name: string;
+  /** Whose account it reads, after "your own": "Gmail", "Slack workspace". */
+  account: string;
   /** Its docs page. */
   docs: string;
   /** What one item is: "email". */
@@ -98,7 +100,7 @@ export interface IntegrationSpec {
    * webhook the platform calls, or a connection that stays open in a worker.
    */
   delivery: 'poll' | 'webhook' | 'stream';
-  /** What your own handler prints about an item: the inside of a template literal over `e`. */
+  /** What your own code prints about an item, short: the inside of a template literal over `e`. */
   describeItem: string;
   /** An example item, shown next to the source so it's clear what Jev reads. */
   sample: { from: string; title?: string; text: string };
@@ -112,24 +114,33 @@ export interface IntegrationSpec {
   connectLabel: string;
   /** How to see it work once your web app runs it. */
   tryIt: string;
-  /** What the builder starts with. */
-  starter: { questions: readonly StarterQuestion[]; rules: readonly StarterRule[] };
+  /** What the builder offers: a few questions, and what to do on the answer. It starts with the first of each. */
+  picks: { ask: readonly AskPick[]; act: readonly ActPick[] };
 }
 
-/** A recipe by id, or your own question. */
-export type StarterQuestion =
-  | { recipe: string }
-  | { id: string; noul: string }
-  | { id: string; choice: string; labels: readonly { name: string; description: string }[] };
-
-export interface StarterRule {
+/** A question the builder offers. */
+export interface AskPick {
+  /** In the builder, such as "Does it need a reply?". */
+  label: string;
+  /** A recipe by id, or your own yes/no question. */
+  question: { recipe: string } | { id: string; noul: string };
+  /** The event to act on, such as "needsReply" or "kind:newsletter". */
   event: string;
-  min?: number;
-  review?: number;
-  /** An action id, or "log" for your own code. */
+  /** What the answer is called, for an action that takes a name, such as a Gmail label. */
+  name?: string;
+}
+
+/** Something the builder offers to do on the answer. */
+export interface ActPick {
+  /** An action's id, or "log" for your own code. */
   do: string;
+  /** In the builder, such as "Archive it". `{name}` is the question's name. */
+  label: string;
+  /** The action's inputs. `{name}` is the question's name. */
   values?: Readonly<Record<string, string>>;
 }
+
+const OWN_CODE: ActPick = { do: 'log', label: 'Run my own code' };
 
 /** How many existing items the code for your own machine reads first, so there's something to see right away. */
 export const BACKFILL = 5;
@@ -182,6 +193,7 @@ export const CATALOG: Readonly<Record<IntegrationId, IntegrationSpec>> = {
   gmail: {
     id: 'gmail',
     name: 'Gmail',
+    account: 'Gmail',
     docs: '/docs/integrations/gmail',
     noun: 'email',
     pkg: '@jev-events/google',
@@ -195,7 +207,7 @@ export const CATALOG: Readonly<Record<IntegrationId, IntegrationSpec>> = {
         label: 'New email in the inbox',
         describe: 'Every email that lands in the inbox from now on.',
         code: (_value, backfill) => call('google.gmail.inbox', backfillOption(backfill)),
-        backfill: `Also judges the ${BACKFILL} latest emails on the first run`,
+        backfill: `Also judges the ${BACKFILL} latest emails`,
         watching: 'Watching the inbox for new email. Stop with Ctrl-C.',
         variable: 'inbox',
       },
@@ -245,24 +257,36 @@ export const CATALOG: Readonly<Record<IntegrationId, IntegrationSpec>> = {
       },
     ],
     delivery: 'poll',
-    describeItem: '${e.item.subject} (from ${e.item.from.address})',
+    describeItem: '${e.item.subject}',
     sample: { from: 'Dana Reyes <dana@acme.com>', title: 'Q3 deck', text: 'Could you look over the Q3 deck before Friday? Mostly the pricing slide.' },
     createApp: googleApp('Gmail', 'gmail.googleapis.com'),
     env: GOOGLE_ENV,
     signIn: GOOGLE_SIGN_IN,
     connectLabel: 'Connect Gmail',
     tryIt: 'Connect your own account through the link, and send yourself an email.',
-    starter: {
-      questions: [{ recipe: 'kind' }, { recipe: 'needsReply' }],
-      rules: [
-        { event: 'kind:newsletter', min: 0.9, do: 'archive' },
-        { event: 'needsReply', min: 0.8, do: 'label', values: { name: 'Needs reply' } },
+    picks: {
+      ask: [
+        { label: 'Does it need a reply?', question: { recipe: 'needsReply' }, event: 'needsReply', name: 'Needs reply' },
+        { label: 'Is it a newsletter?', question: { recipe: 'kind' }, event: 'kind:newsletter', name: 'Newsletter' },
+        {
+          label: 'Your own: “Is this asking for a refund?”',
+          question: { id: 'refund', noul: 'Is this asking for a refund?' },
+          event: 'refund',
+          name: 'Refund',
+        },
+      ],
+      act: [
+        { do: 'label', label: 'Label it “{name}”', values: { name: '{name}' } },
+        { do: 'archive', label: 'Archive it' },
+        { do: 'star', label: 'Star it' },
+        OWN_CODE,
       ],
     },
   },
   calendar: {
     id: 'calendar',
     name: 'Google Calendar',
+    account: 'Google Calendar',
     docs: '/docs/integrations/google-calendar',
     noun: 'event',
     pkg: '@jev-events/google',
@@ -276,7 +300,7 @@ export const CATALOG: Readonly<Record<IntegrationId, IntegrationSpec>> = {
         label: "Invites you haven't answered",
         describe: 'New invitations, and changes to them, until you answer.',
         code: (_value, backfill) => call('google.calendar.invites', backfillOption(backfill)),
-        backfill: `Also judges the next ${BACKFILL} invites you haven't answered, on the first run`,
+        backfill: `Also judges ${BACKFILL} unanswered invites`,
         watching: 'Watching for new invites. Stop with Ctrl-C.',
         variable: 'invites',
       },
@@ -285,8 +309,8 @@ export const CATALOG: Readonly<Record<IntegrationId, IntegrationSpec>> = {
         label: 'Every new or changed event',
         describe: 'Every event on the calendar that is added, moved or cancelled, including your own.',
         code: (_value, backfill) => call('google.calendar.events', backfillOption(backfill)),
-        backfill: `Also judges the next ${BACKFILL} events on the first run`,
-        watching: 'Watching the calendar for new and changed events. Stop with Ctrl-C.',
+        backfill: `Also judges the next ${BACKFILL} events`,
+        watching: 'Watching the calendar for changes. Stop with Ctrl-C.',
         variable: 'events',
       },
     ],
@@ -317,24 +341,36 @@ export const CATALOG: Readonly<Record<IntegrationId, IntegrationSpec>> = {
       },
     ],
     delivery: 'poll',
-    describeItem: '${e.item.title} (from ${e.item.organizer.email})',
+    describeItem: '${e.item.title}',
     sample: { from: 'sam@vendor.io', title: 'Quick sync: 15 minutes on your data stack', text: 'Tue 14:00–14:15 · Google Meet · 2 guests' },
     createApp: googleApp('Google Calendar', 'calendar-json.googleapis.com'),
     env: GOOGLE_ENV,
     signIn: GOOGLE_SIGN_IN,
     connectLabel: 'Connect Google Calendar',
     tryIt: 'Connect your own account through the link, and have someone invite you to a meeting.',
-    starter: {
-      questions: [{ recipe: 'important' }, { recipe: 'likelySales' }],
-      rules: [
-        { event: 'important', min: 0.8, do: 'log' },
-        { event: 'likelySales', min: 0.9, do: 'decline', values: { comment: "Thanks, but I'll pass." } },
+    picks: {
+      ask: [
+        { label: 'Is it a sales pitch?', question: { recipe: 'likelySales' }, event: 'likelySales' },
+        { label: 'Is it important?', question: { recipe: 'important' }, event: 'important' },
+        {
+          label: 'Your own: “Is it a meeting without an agenda?”',
+          question: { id: 'noAgenda', noul: 'Is it a meeting without an agenda?' },
+          event: 'noAgenda',
+        },
+      ],
+      act: [
+        // Without a note, so the line fits.
+        { do: 'decline', label: 'Decline it', values: { comment: '' } },
+        { do: 'accept', label: 'Accept it' },
+        { do: 'maybe', label: 'Answer maybe' },
+        OWN_CODE,
       ],
     },
   },
   slack: {
     id: 'slack',
     name: 'Slack',
+    account: 'Slack workspace',
     docs: '/docs/integrations/slack',
     noun: 'message',
     pkg: '@jev-events/slack',
@@ -358,7 +394,7 @@ export const CATALOG: Readonly<Record<IntegrationId, IntegrationSpec>> = {
             ...backfillOption(backfill),
           ]);
         },
-        backfill: `Also judges the ${BACKFILL} latest messages each time it starts`,
+        backfill: `Also judges the ${BACKFILL} latest messages`,
         watching: 'Watching for new messages. Stop with Ctrl-C.',
         variable: 'team',
       },
@@ -387,7 +423,7 @@ export const CATALOG: Readonly<Record<IntegrationId, IntegrationSpec>> = {
       },
     ],
     delivery: 'webhook',
-    describeItem: '${e.item.author.name}: ${e.item.text}',
+    describeItem: '${e.item.text}',
     sample: { from: 'Priya · #deploys', text: 'Checkout is returning 500s since the 14:05 deploy, can someone roll back?' },
     createApp: (urls) => [
       {
@@ -404,17 +440,24 @@ export const CATALOG: Readonly<Record<IntegrationId, IntegrationSpec>> = {
     signIn: 'Create your own Slack app and add it to your workspace: the command walks you through it. Then invite the app to a channel with `/invite @jev_events`.',
     connectLabel: 'Add to Slack',
     tryIt: 'Add the app to your workspace through the link, invite it to a channel with `/invite @jev_events`, and post a message there.',
-    starter: {
-      questions: [{ recipe: 'urgent' }, { recipe: 'needsAnswer' }],
-      rules: [
-        { event: 'urgent', min: 0.9, do: 'post', values: { channel: '#incidents' } },
-        { event: 'needsAnswer', min: 0.8, do: 'react', values: { emoji: 'eyes' } },
+    picks: {
+      ask: [
+        { label: 'Is it urgent?', question: { recipe: 'urgent' }, event: 'urgent' },
+        { label: 'Does it need an answer?', question: { recipe: 'needsAnswer' }, event: 'needsAnswer' },
+        { label: 'Your own: “Is this a bug report?”', question: { id: 'bugReport', noul: 'Is this a bug report?' }, event: 'bugReport' },
+      ],
+      act: [
+        { do: 'post', label: 'Post it in #incidents', values: { channel: '#incidents' } },
+        { do: 'react', label: 'React with :eyes:', values: { emoji: 'eyes' } },
+        { do: 'reply', label: 'Reply in the thread', values: { text: "Thanks, we're on it." } },
+        OWN_CODE,
       ],
     },
   },
   twitch: {
     id: 'twitch',
     name: 'Twitch',
+    account: 'Twitch account',
     docs: '/docs/integrations/twitch',
     noun: 'chat message',
     pkg: '@jev-events/twitch',
@@ -455,7 +498,7 @@ export const CATALOG: Readonly<Record<IntegrationId, IntegrationSpec>> = {
         id: 'warn',
         label: 'Warn',
         describe: 'The chatter has to acknowledge the warning before chatting again.',
-        params: [{ key: 'reason', label: 'Reason', kind: 'text', default: 'Please keep chat kind.' }],
+        params: [{ key: 'reason', label: 'Reason', kind: 'text', default: 'Please keep it kind.' }],
         code: (values) => `twitch.warn({ reason: ${str(values.reason ?? '')} })`,
       },
       {
@@ -481,7 +524,7 @@ export const CATALOG: Readonly<Record<IntegrationId, IntegrationSpec>> = {
       },
     ],
     delivery: 'stream',
-    describeItem: '${e.item.author.name}: ${e.item.text}',
+    describeItem: '${e.item.text}',
     sample: { from: 'viewer_42', text: 'is anyone else getting no sound?? been like this for 2 min' },
     createApp: (urls) => [
       {
@@ -497,11 +540,17 @@ export const CATALOG: Readonly<Record<IntegrationId, IntegrationSpec>> = {
     signIn: 'Sign in with your Twitch account. The first time, the command walks you through registering your own Twitch app.',
     connectLabel: 'Connect Twitch',
     tryIt: 'Connect your own Twitch account through the link, and write in your chat.',
-    starter: {
-      questions: [{ recipe: 'hateful' }, { recipe: 'spam' }],
-      rules: [
-        { event: 'hateful', min: 0.9, do: 'timeout', values: { seconds: '600' } },
-        { event: 'spam', min: 0.85, do: 'deleteMessage' },
+    picks: {
+      ask: [
+        { label: 'Is it hateful?', question: { recipe: 'hateful' }, event: 'hateful' },
+        { label: 'Is it spam?', question: { recipe: 'spam' }, event: 'spam' },
+        { label: 'Your own: “Is it self-promotion?”', question: { id: 'promo', noul: 'Is it self-promotion?' }, event: 'promo' },
+      ],
+      act: [
+        { do: 'timeout', label: 'Time them out for 10 minutes', values: { seconds: '600' } },
+        { do: 'deleteMessage', label: 'Delete the message' },
+        { do: 'warn', label: 'Warn them' },
+        OWN_CODE,
       ],
     },
   },

@@ -1,0 +1,1222 @@
+/* The home page: the blue hero with its two tracks, How it works, Works with, and the blue close.
+   The hero's drawing is laid out in u, one pixel of the 1440-wide design, so it scales with the page
+   (up to 1.25px); on phones and tablets it turns into the chute, laid out in m. Everything that moves
+   has its still frame as its base style, which is what reduced motion shows. */
+main.home {
+  container-type: inline-size;
+  --cta-h: 60px;
+  --cta-size: 18px;
+  --cta-pad: 28px;
+  --cta-gap: 36px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+/* ---------- The two ways in, under the hero and in the close ---------- */
+
+.ctas {
+  display: flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px var(--cta-gap);
+}
+
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  height: var(--cta-h);
+  padding: 0 var(--cta-pad);
+  background: var(--color-cream);
+  color: var(--color-field);
+  font-size: var(--cta-size);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.cta-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--cta-size);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 7px;
+  text-decoration-thickness: 2px;
+  white-space: nowrap;
+}
+
+/* ---------- Hero ---------- */
+
+.hero-body {
+  --u: min(1.25px, 100cqw / 1440);
+  --cta-h: max(44px, calc(60 * var(--u)));
+  --cta-size: max(15px, calc(18 * var(--u)));
+  --cta-pad: max(20px, calc(28 * var(--u)));
+  --cta-gap: max(24px, calc(36 * var(--u)));
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: clamp(calc(744 * var(--u)), calc(100svh - 96px), calc(864 * var(--u)));
+  padding: 0 var(--gutter);
+  overflow: hidden;
+}
+
+.hero-title {
+  position: relative;
+  z-index: 1;
+  max-width: 7.8em;
+  margin-top: calc(16 * var(--u));
+  font-size: calc(128 * var(--u));
+  font-weight: 800;
+  line-height: 0.88;
+  letter-spacing: -0.045em;
+}
+
+.hero-foot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: calc(48 * var(--u));
+  margin-top: auto;
+  padding-bottom: calc(64 * var(--u));
+}
+
+.hero-lead {
+  max-width: calc(660 * var(--u));
+  font-size: max(16px, calc(22 * var(--u)));
+  line-height: 1.45;
+}
+
+/* Desktop: new emails ride in from the left, cross Jev's line and come out answered; a switch past
+   Jev sends the ones at 0.85 or more up to the other track. Each email is drawn twice, once in each
+   window, so it seems to change exactly where it crosses Jev. */
+.tracks {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: calc(864 * var(--u));
+  pointer-events: none;
+}
+
+.tracks-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(3000 * var(--u));
+  height: calc(864 * var(--u));
+}
+
+.track {
+  fill: none;
+  stroke: var(--color-cream);
+}
+
+.track-faint {
+  stroke: rgb(244 239 230 / 0.5);
+}
+
+.tracks-window {
+  position: absolute;
+  top: calc(344 * var(--u));
+  height: calc(360 * var(--u));
+  overflow: hidden;
+}
+
+.tracks-in {
+  left: 0;
+  width: calc(600 * var(--u));
+}
+
+.tracks-out {
+  left: calc(600 * var(--u));
+  right: 0;
+}
+
+.tracks-chip {
+  position: absolute;
+  top: calc(256 * var(--u));
+  left: calc(-400 * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(14 * var(--u));
+  width: calc(296 * var(--u));
+  height: calc(48 * var(--u));
+  padding: 0 calc(18 * var(--u));
+  background: var(--color-field);
+  box-shadow: inset 0 0 0 calc(1.5 * var(--u)) var(--color-cream);
+  font-size: calc(16 * var(--u));
+  font-weight: 500;
+  white-space: nowrap;
+  transform: translate(calc(var(--x) * var(--u)), calc(var(--y) * var(--u)));
+  animation: hero-on 48s linear infinite;
+}
+
+.tracks-chip.is-yes {
+  animation-name: hero-up;
+}
+
+.tracks-out .tracks-chip {
+  left: calc(-1000 * var(--u));
+}
+
+.tracks-out .is-yes {
+  background: var(--color-cream);
+  box-shadow: none;
+  color: var(--color-field);
+}
+
+.tracks-out .is-no {
+  box-shadow: inset 0 0 0 calc(1.5 * var(--u)) rgb(244 239 230 / 0.5);
+  color: rgb(244 239 230 / 0.72);
+}
+
+.tracks-score {
+  font-family: var(--font-mono);
+  font-size: calc(14 * var(--u));
+  font-weight: 500;
+}
+
+.tracks-bar {
+  position: absolute;
+  top: calc(560 * var(--u));
+  left: calc(598 * var(--u));
+  width: calc(4 * var(--u));
+  height: calc(124 * var(--u));
+  background: var(--color-cream);
+}
+
+.tracks-jev {
+  position: absolute;
+  top: calc(532 * var(--u));
+  left: calc(572 * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(56 * var(--u));
+  height: calc(28 * var(--u));
+  background: var(--color-cream);
+  color: var(--color-field);
+  font-size: calc(15 * var(--u));
+  font-weight: 800;
+}
+
+.tracks-question {
+  position: absolute;
+  top: calc(532 * var(--u));
+  left: calc(176 * var(--u));
+  display: flex;
+  align-items: center;
+  height: calc(28 * var(--u));
+  font-size: calc(22 * var(--u));
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tracks-label {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: max(11px, calc(13 * var(--u)));
+  line-height: calc(18 * var(--u));
+  white-space: nowrap;
+}
+
+.tracks-label-yes {
+  top: calc(370 * var(--u));
+  left: calc(940 * var(--u));
+}
+
+.tracks-label-no {
+  top: calc(662 * var(--u));
+  left: calc(940 * var(--u));
+  color: rgb(244 239 230 / 0.72);
+}
+
+.tracks-label-new {
+  top: calc(662 * var(--u));
+  left: var(--gutter);
+}
+
+/* 64u a second, 384u between emails: a 48 s loop. The curve follows the drawn switch. */
+@keyframes hero-on {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(calc(3072 * var(--u)), 0);
+  }
+}
+
+@keyframes hero-up {
+  0% { transform: translate(0, 0); }
+  31.64% { transform: translate(calc(972 * var(--u)), 0); }
+  32.53% { transform: translate(calc(999.2 * var(--u)), calc(-5.6 * var(--u))); }
+  33.26% { transform: translate(calc(1021.6 * var(--u)), calc(-20.8 * var(--u))); }
+  33.87% { transform: translate(calc(1040.4 * var(--u)), calc(-43.2 * var(--u))); }
+  34.4% { transform: translate(calc(1056.8 * var(--u)), calc(-70.4 * var(--u))); }
+  34.9% { transform: translate(calc(1072 * var(--u)), calc(-100 * var(--u))); }
+  35.39% { transform: translate(calc(1087.2 * var(--u)), calc(-129.6 * var(--u))); }
+  35.92% { transform: translate(calc(1103.6 * var(--u)), calc(-156.8 * var(--u))); }
+  36.54% { transform: translate(calc(1122.4 * var(--u)), calc(-179.2 * var(--u))); }
+  37.27% { transform: translate(calc(1144.8 * var(--u)), calc(-194.4 * var(--u))); }
+  38.15% { transform: translate(calc(1172 * var(--u)), calc(-200 * var(--u))); }
+  100% { transform: translate(calc(3072 * var(--u)), calc(-200 * var(--u))); }
+}
+
+/* Phones and tablets: the same, turned on its side. */
+.chute-wrap {
+  display: none;
+}
+
+.chute-question {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.chute-new {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.chute {
+  position: relative;
+  width: calc(320 * var(--m));
+  height: calc(410 * var(--m));
+  margin-top: 12px;
+}
+
+.chute-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.chute-window {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.chute-in {
+  top: 0;
+  height: calc(150 * var(--m));
+}
+
+.chute-out {
+  top: calc(150 * var(--m));
+  height: calc(260 * var(--m));
+}
+
+.chute-chip {
+  position: absolute;
+  top: calc(-40 * var(--m));
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(10 * var(--m));
+  width: calc(232 * var(--m));
+  height: calc(40 * var(--m));
+  padding: 0 calc(14 * var(--m));
+  background: var(--color-field);
+  box-shadow: inset 0 0 0 1.5px var(--color-cream);
+  font-size: calc(13 * var(--m));
+  font-weight: 500;
+  white-space: nowrap;
+  transform: translate(calc(var(--x) * var(--m)), calc(var(--y) * var(--m)));
+  animation: chute-no 24s linear infinite;
+}
+
+.chute-chip.is-yes {
+  animation-name: chute-yes;
+}
+
+.chute-out .chute-chip {
+  top: calc(-190 * var(--m));
+}
+
+.chute-out .is-yes {
+  background: var(--color-cream);
+  box-shadow: none;
+  color: var(--color-field);
+}
+
+.chute-out .is-no {
+  box-shadow: inset 0 0 0 1.5px rgb(244 239 230 / 0.5);
+  color: rgb(244 239 230 / 0.72);
+}
+
+.chute-score {
+  font-family: var(--font-mono);
+  font-size: calc(12 * var(--m));
+  font-weight: 500;
+}
+
+.chute-bar {
+  position: absolute;
+  top: calc(148 * var(--m));
+  left: calc(-12 * var(--m));
+  width: calc(256 * var(--m));
+  height: calc(4 * var(--m));
+  background: var(--color-cream);
+}
+
+.chute-jev {
+  position: absolute;
+  top: calc(136 * var(--m));
+  left: calc(244 * var(--m));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(56 * var(--m));
+  height: calc(28 * var(--m));
+  background: var(--color-cream);
+  color: var(--color-field);
+  font-size: calc(15 * var(--m));
+  font-weight: 800;
+}
+
+.chute-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.chute-legend li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chute-legend li::before {
+  content: '';
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.chute-legend-yes::before {
+  background: var(--color-cream);
+}
+
+.chute-legend-no {
+  color: rgb(244 239 230 / 0.72);
+}
+
+.chute-legend-no::before {
+  box-shadow: inset 0 0 0 1.5px rgb(244 239 230 / 0.5);
+}
+
+/* 32m a second, 96m between emails: a 24 s loop. */
+@keyframes chute-no {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(0, calc(768 * var(--m)));
+  }
+}
+
+@keyframes chute-yes {
+  0% { transform: translate(0, 0); }
+  27.34% { transform: translate(0, calc(210 * var(--m))); }
+  29.04% { transform: translate(calc(2.46 * var(--m)), calc(223.06 * var(--m))); }
+  30.44% { transform: translate(calc(9.15 * var(--m)), calc(233.81 * var(--m))); }
+  31.62% { transform: translate(calc(19.01 * var(--m)), calc(242.83 * var(--m))); }
+  32.64% { transform: translate(calc(30.98 * var(--m)), calc(250.7 * var(--m))); }
+  33.59% { transform: translate(calc(44 * var(--m)), calc(258 * var(--m))); }
+  34.54% { transform: translate(calc(57.02 * var(--m)), calc(265.3 * var(--m))); }
+  35.57% { transform: translate(calc(68.99 * var(--m)), calc(273.17 * var(--m))); }
+  36.74% { transform: translate(calc(78.85 * var(--m)), calc(282.19 * var(--m))); }
+  38.14% { transform: translate(calc(85.54 * var(--m)), calc(292.94 * var(--m))); }
+  39.84% { transform: translate(calc(88 * var(--m)), calc(306 * var(--m))); }
+  100% { transform: translate(calc(88 * var(--m)), calc(768 * var(--m))); }
+}
+
+@media (max-width: 1039px) {
+  main.home,
+  .hero-body {
+    --cta-h: 56px;
+    --cta-size: 17px;
+    --cta-pad: 24px;
+    --cta-gap: 32px;
+  }
+
+  .hero-body {
+    height: auto;
+    padding: 0 var(--gutter) 64px;
+  }
+
+  .hero-title {
+    margin-top: 24px;
+    font-size: clamp(48px, 13.5cqw, 104px);
+  }
+
+  .hero-foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 32px;
+    margin-top: 28px;
+    padding-bottom: 0;
+  }
+
+  .hero-lead {
+    max-width: 560px;
+    font-size: 18px;
+  }
+
+  .tracks {
+    display: none;
+  }
+
+  .chute-wrap {
+    --m: min(1.25px, (100cqw - 2 * var(--gutter)) / 320);
+    display: block;
+    margin-top: 56px;
+  }
+}
+
+@media (max-width: 639px) {
+  main.home,
+  .hero-body {
+    --cta-h: 52px;
+    --cta-size: 16px;
+    --cta-pad: 20px;
+    --cta-gap: 28px;
+  }
+
+  .hero-body {
+    padding-bottom: 48px;
+  }
+
+  .chute-wrap {
+    margin-top: 44px;
+  }
+}
+
+/* ---------- The sections on paper ---------- */
+
+.home-section {
+  padding: 150px var(--gutter) 0;
+}
+
+.home-heading {
+  padding-top: 24px;
+  border-top: 2px solid var(--color-ink);
+  font-size: clamp(44px, 12cqw, 80px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+/* ---------- How it works ---------- */
+
+.hiw-lead {
+  max-width: 920px;
+  margin-top: 28px;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.hiw-panels {
+  display: flex;
+  align-items: flex-start;
+  gap: 60px;
+  margin-top: 64px;
+}
+
+.hiw-col-code {
+  flex: 0 0 652px;
+}
+
+.hiw-col-inbox {
+  flex: 1 1 600px;
+  min-width: 0;
+  max-width: 600px;
+}
+
+.hiw-note {
+  margin-top: 24px;
+  color: var(--color-grey);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.hiw-note code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.hiw-figures {
+  margin-top: 64px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-ink);
+  color: var(--color-grey);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.hiw-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+/* The code, with the step rail beside it. */
+.hiw-code {
+  background: #ffffff;
+  border: 1px solid var(--color-ink);
+}
+
+.hiw-code .hiw-bar {
+  color: var(--color-grey);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.hiw-code-body {
+  display: flex;
+  gap: 20px;
+  padding: 20px 24px;
+}
+
+.hiw-rail {
+  position: relative;
+  flex-shrink: 0;
+  width: 140px;
+  height: calc(16 * 24px);
+}
+
+.hiw-rail li {
+  position: absolute;
+  top: calc((var(--at) - 1) * 24px);
+  left: 0;
+  width: 100%;
+}
+
+.hiw-rail strong {
+  display: block;
+  color: var(--color-field);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+.hiw-rail span {
+  display: block;
+  color: var(--color-grey);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.hiw-pre {
+  --line: 24px;
+  min-width: 0;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: var(--line);
+  white-space: pre;
+}
+
+.hiw-dim {
+  color: var(--color-grey);
+}
+
+.hiw-mark {
+  position: relative;
+  display: inline-block;
+  height: var(--line);
+  margin: 0 -4px;
+  padding: 0 4px;
+  color: var(--color-field);
+  font-weight: 500;
+  vertical-align: top;
+}
+
+.hiw-mark::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--color-field);
+  opacity: 0.13;
+}
+
+.hiw-mark-text {
+  position: relative;
+}
+
+.hiw-mark-lit {
+  position: absolute;
+  inset: 0;
+  padding: 0 4px;
+  background: var(--color-field);
+  color: #ffffff;
+  user-select: none;
+  animation: mark-act 40s linear infinite;
+}
+
+.hiw-mark-watch .hiw-mark-lit {
+  animation: mark-watch 4s linear infinite;
+}
+
+.hiw-mark-ask .hiw-mark-lit {
+  animation: mark-ask 4s linear infinite;
+}
+
+/* Each email takes 4 s: Watch while it comes in, Ask while Jev answers. */
+@keyframes mark-watch {
+  0% { opacity: 0; }
+  2%, 33% { opacity: 1; }
+  36%, 100% { opacity: 0; }
+}
+
+@keyframes mark-ask {
+  0%, 33% { opacity: 0; }
+  36%, 65% { opacity: 1; }
+  68%, 100% { opacity: 0; }
+}
+
+/* Act lights up once the label goes on, for the 1st, 4th and 7th of the ten emails. */
+@keyframes mark-act {
+  0% { opacity: 0; }
+  6.6% { opacity: 0; }
+  7%, 9.6% { opacity: 1; }
+  10% { opacity: 0; }
+  36.6% { opacity: 0; }
+  37%, 39.6% { opacity: 1; }
+  40% { opacity: 0; }
+  66.6% { opacity: 0; }
+  67%, 69.6% { opacity: 1; }
+  70% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* Dana's inbox, drawn like Gmail's. */
+.inbox {
+  background: #ffffff;
+  border: 1px solid var(--color-ink);
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+
+.inbox .hiw-bar svg {
+  width: 18px;
+  height: 18px;
+}
+
+.inbox .hiw-bar span {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.inbox-columns {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.inbox-columns span {
+  color: var(--color-grey);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inbox-columns code {
+  color: var(--color-field);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.inbox-window {
+  height: calc(6 * 64px);
+  overflow: hidden;
+}
+
+.inbox-list {
+  transform: translateY(0);
+  animation: inbox-arrive 40s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
+}
+
+.inbox-row {
+  position: relative;
+  height: 64px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.inbox-wash {
+  position: absolute;
+  inset: 0;
+  background: var(--color-field);
+  opacity: 0;
+}
+
+.inbox-row-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 100%;
+  padding: 0 20px;
+}
+
+.inbox-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 20px;
+}
+
+.inbox-from {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-line {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.inbox-label {
+  display: inline-flex;
+  flex-shrink: 0;
+  max-width: 110px;
+  margin-right: 8px;
+  overflow: hidden;
+}
+
+.inbox-label span {
+  padding: 0 7px;
+  border-radius: 2px;
+  background: var(--color-field);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.inbox-subject {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inbox-snippet {
+  flex: 0 1000 auto;
+  min-width: 0;
+  margin-left: 6px;
+  overflow: hidden;
+  color: var(--color-grey);
+  text-overflow: ellipsis;
+}
+
+.inbox-answer {
+  position: relative;
+  flex-shrink: 0;
+  width: 48px;
+  height: 20px;
+}
+
+.inbox-new,
+.inbox-score {
+  position: absolute;
+  top: 0;
+  right: 0;
+  line-height: 20px;
+}
+
+.inbox-new {
+  color: var(--color-field);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  opacity: 0;
+}
+
+.inbox-score {
+  color: var(--color-grey);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.inbox-score.is-yes {
+  color: var(--color-field);
+}
+
+.is-live .inbox-wash {
+  animation: inbox-wash 40s linear var(--delay) infinite;
+}
+
+.is-live .inbox-label {
+  animation: inbox-label 40s linear var(--delay) infinite;
+}
+
+.is-live .inbox-new {
+  animation: inbox-new 40s linear var(--delay) infinite;
+}
+
+.is-live .inbox-score {
+  animation: inbox-answer 40s linear var(--delay) infinite;
+}
+
+/* Inside each email's 4 s: the number replaces “New” at 1.45 s, the label grows in from 2.8 s, and
+   the wash is gone by the time the next email comes. */
+@keyframes inbox-new {
+  0%, 3.62% { opacity: 1; }
+  4%, 100% { opacity: 0; }
+}
+
+@keyframes inbox-answer {
+  0%, 3.62% { opacity: 0; }
+  4%, 100% { opacity: 1; }
+}
+
+@keyframes inbox-wash {
+  0%, 8.5% { opacity: 0.12; }
+  10%, 100% { opacity: 0; }
+}
+
+@keyframes inbox-label {
+  0%, 7% {
+    max-width: 0;
+    margin-right: 0;
+  }
+  7.75%, 100% {
+    max-width: 110px;
+    margin-right: 8px;
+  }
+}
+
+/* Every 4 s the list moves down one row to make room for the next email. */
+@keyframes inbox-arrive {
+  0% { transform: translateY(-640px); }
+  1.25%, 10% { transform: translateY(-576px); }
+  11.25%, 20% { transform: translateY(-512px); }
+  21.25%, 30% { transform: translateY(-448px); }
+  31.25%, 40% { transform: translateY(-384px); }
+  41.25%, 50% { transform: translateY(-320px); }
+  51.25%, 60% { transform: translateY(-256px); }
+  61.25%, 70% { transform: translateY(-192px); }
+  71.25%, 80% { transform: translateY(-128px); }
+  81.25%, 90% { transform: translateY(-64px); }
+  91.25%, 100% { transform: translateY(0); }
+}
+
+@media (max-width: 1279px) {
+  .hiw-panels {
+    flex-direction: column;
+    gap: 48px;
+    max-width: 652px;
+  }
+
+  .hiw-col-code,
+  .hiw-col-inbox {
+    flex: none;
+    width: 100%;
+    max-width: none;
+  }
+}
+
+/* ---------- Works with ---------- */
+
+.apps {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  margin-top: 56px;
+  border-top: 1px solid rgb(17 17 17 / 0.2);
+  border-left: 1px solid rgb(17 17 17 / 0.2);
+}
+
+.apps li {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 168px;
+  padding: 28px;
+  border-right: 1px solid rgb(17 17 17 / 0.2);
+  border-bottom: 1px solid rgb(17 17 17 / 0.2);
+}
+
+.apps svg {
+  width: 40px;
+  height: 40px;
+}
+
+.apps span {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.apps-custom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 28px;
+  font-size: 17px;
+}
+
+.apps-custom svg {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+}
+
+.apps-custom a {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+
+/* ---------- The close ---------- */
+
+.closing {
+  display: flex;
+  flex-direction: column;
+  margin-top: 170px;
+  padding: 0 var(--gutter);
+}
+
+.closing-title {
+  margin-top: 120px;
+  font-size: clamp(48px, 15cqw, 120px);
+  font-weight: 800;
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+}
+
+.closing .ctas {
+  margin-top: 56px;
+}
+
+.waitlist {
+  margin-top: 40px;
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.waitlist-toggle {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+  cursor: pointer;
+}
+
+.waitlist-toggle:hover {
+  opacity: 0.75;
+}
+
+.waitlist-panel {
+  max-width: 880px;
+  margin-top: 20px;
+}
+
+.waitlist-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.waitlist-form input {
+  flex: 1 1 220px;
+  min-width: 0;
+  height: 52px;
+  padding: 0 16px;
+  border: 2px solid var(--color-cream);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-cream);
+  font-size: 16px;
+}
+
+.waitlist-form input[name='monitor'] {
+  flex: 2 1 300px;
+}
+
+.waitlist-form input::placeholder {
+  color: rgb(244 239 230 / 0.6);
+}
+
+.waitlist-form button {
+  height: 52px;
+  padding: 0 24px;
+  background: var(--color-cream);
+  color: var(--color-field);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.waitlist-form button:hover {
+  opacity: 0.85;
+}
+
+.waitlist-form button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.waitlist-form .waitlist-status {
+  flex-basis: 100%;
+}
+
+.waitlist-status {
+  font-size: 15px;
+}
+
+.closing .site-footer {
+  margin-top: 176px;
+}
+
+/* ---------- Smaller screens ---------- */
+
+@media (max-width: 1023px) {
+  .home-section {
+    padding-top: 112px;
+  }
+
+  .apps {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .apps li {
+    height: 150px;
+  }
+
+  .closing {
+    margin-top: 128px;
+  }
+
+  .closing-title {
+    margin-top: 88px;
+  }
+
+  .closing .site-footer {
+    margin-top: 128px;
+  }
+}
+
+@media (max-width: 639px) {
+  .home-section {
+    padding-top: 88px;
+  }
+
+  .hiw-lead {
+    font-size: 19px;
+  }
+
+  .hiw-panels {
+    margin-top: 44px;
+  }
+
+  /* The code gets the full width and scrolls sideways; the steps move under it. */
+  .hiw-code-body {
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .hiw-rail {
+    order: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: auto;
+    height: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  .hiw-rail li {
+    position: static;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .hiw-rail strong {
+    flex-shrink: 0;
+    width: 52px;
+  }
+
+  .hiw-pre {
+    --line: 22px;
+    overflow-x: auto;
+    font-size: 13px;
+  }
+
+  .hiw-bar,
+  .inbox-columns,
+  .inbox-row-inner {
+    padding: 0 16px;
+  }
+
+  .hiw-figures {
+    margin-top: 48px;
+  }
+
+  .apps {
+    grid-template-columns: repeat(2, 1fr);
+    margin-top: 40px;
+  }
+
+  .apps li {
+    height: 120px;
+    padding: 20px;
+  }
+
+  .apps svg {
+    width: 32px;
+    height: 32px;
+  }
+
+  .apps-custom {
+    align-items: flex-start;
+    font-size: 16px;
+  }
+
+  .closing {
+    margin-top: 104px;
+  }
+
+  .closing-title {
+    margin-top: 64px;
+  }
+
+  .closing .ctas {
+    margin-top: 40px;
+  }
+
+  .closing .site-footer {
+    margin-top: 96px;
+  }
+}
