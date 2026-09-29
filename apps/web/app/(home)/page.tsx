@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Closing } from '@/components/home/closing';
 import { Hero } from '@/components/home/hero';
 import { HowItWorks } from '@/components/home/how-it-works';
+import { LogoBand } from '@/components/home/logo-band';
 import { WorksWith } from '@/components/home/works-with';
 import { Nav } from '@/components/site/nav';
 import { site } from '@/lib/site';
@@ -24,6 +25,7 @@ export default function HomePage() {
       <Nav tone="field" current="/" />
       <main id="main" className="home">
         <Hero />
+        <LogoBand />
         <HowItWorks />
         <WorksWith />
         <Closing />

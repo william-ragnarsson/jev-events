@@ -1,36 +1,9 @@
 import Link from 'next/link';
 
-import {
-  DiscordIcon,
-  GitHubIcon,
-  GmailIcon,
-  GoogleCalendarIcon,
-  GoogleDriveIcon,
-  LinearIcon,
-  NotionIcon,
-  OutlookIcon,
-  SlackIcon,
-  TeamsIcon,
-  TwitchIcon,
-  WebhookIcon,
-  YouTubeIcon,
-} from '@/components/brand-icons';
-import './home.css';
+import { WebhookIcon } from '@/components/brand-icons';
 
-const APPS = [
-  { name: 'Gmail', Icon: GmailIcon },
-  { name: 'Outlook', Icon: OutlookIcon },
-  { name: 'Google Calendar', Icon: GoogleCalendarIcon },
-  { name: 'Slack', Icon: SlackIcon },
-  { name: 'Microsoft Teams', Icon: TeamsIcon },
-  { name: 'Discord', Icon: DiscordIcon },
-  { name: 'Linear', Icon: LinearIcon },
-  { name: 'GitHub', Icon: GitHubIcon },
-  { name: 'Notion', Icon: NotionIcon },
-  { name: 'Google Drive', Icon: GoogleDriveIcon },
-  { name: 'Twitch', Icon: TwitchIcon },
-  { name: 'YouTube', Icon: YouTubeIcon },
-];
+import { APPS } from './apps';
+import './home.css';
 
 /** Every app in one plain grid, and the way in for the rest. */
 export function WorksWith() {
@@ -40,10 +13,11 @@ export function WorksWith() {
         Works with
       </h2>
       <ul className="apps">
-        {APPS.map(({ name, Icon }) => (
+        {APPS.map(({ name, Icon, does, scale }) => (
           <li key={name}>
-            <Icon aria-hidden="true" />
+            <Icon aria-hidden="true" style={{ scale }} />
             <span>{name}</span>
+            <small>{does}</small>
           </li>
         ))}
       </ul>
