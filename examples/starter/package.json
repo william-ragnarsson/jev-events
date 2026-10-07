@@ -1,0 +1,21 @@
+{
+  "name": "@jev-events/example-starter",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.9"
+  },
+  "scripts": {
+    "bluesky": "node --conditions=source --env-file-if-exists=.env --import tsx bluesky.ts",
+    "twitch": "node --conditions=source --env-file-if-exists=.env --import tsx twitch.ts",
+    "slack": "node --conditions=source --env-file-if-exists=.env --import tsx slack.ts",
+    "google-token": "node --conditions=source --env-file-if-exists=.env --import tsx google-token.ts",
+    "gmail": "node --conditions=source --env-file-if-exists=.env --import tsx gmail.ts",
+    "calendar": "node --conditions=source --env-file-if-exists=.env --import tsx calendar.ts"
+  },
+  "dependencies": {
+    "@jev-events/google": "^0.1.0",
+    "@jev-events/slack": "^0.1.0",
+    "jev-events": "^0.1.0"
+  }
+}
