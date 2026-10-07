@@ -55,14 +55,14 @@ describe("events", () => {
     });
   });
 
-  it("takes the address saved at sign-in, or asks Calendar for it", async () => {
+  it("takes the address saved at sign-in, or asks Gmail for it", async () => {
     expect(await watch().session()).toMatchObject({ me: "me@acme.com", calendarId: "primary" });
     expect(google.requests).toEqual([]);
 
     const { credentials } = google.connection();
     const unnamed = checker(events(), { connection: toConnection("google", { account: "google", credentials }) });
     expect((await unnamed.session()).me).toBe("me@acme.com");
-    expect(google.calls("GET /calendars/primary")).toHaveLength(1);
+    expect(google.calls("GET /profile")).toHaveLength(1);
   });
 
   it("emits events as they're added, once each, with times in the calendar's time zone", async () => {

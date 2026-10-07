@@ -84,7 +84,8 @@ function calendarSource(id: string, options: EventsOptions, wanted: (event: Cale
     async session(ctx) {
       const connection = connectionOf(ctx, id);
       const api = connectedApi(ctx, connection);
-      const me = await addressOf(connection, async () => (await api.calendar<{ id: string }>("GET", "/calendars/primary")).id);
+      // calendars.get needs a calendar read scope that calendar.events doesn't include. The Gmail scope the sign-in also asks for covers /profile.
+      const me = await addressOf(connection, async () => (await api.gmail<{ emailAddress: string }>("GET", "/profile")).emailAddress);
       return { api, me, calendarId, people: new People(api, me) };
     },
     check: (ctx) => new CalendarSync(ctx, options, wanted).check(),
